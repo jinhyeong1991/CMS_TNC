@@ -1209,12 +1209,22 @@ const LG_NAENGJANGGO_FEES = [
   {months:72, year:6, col:18, sub:'027'},  // 72개월 신규결합
   {months:72, year:6, col:19, sub:'028'},  // 72개월 기존결합
 ];
-const LG_NAENGJANGGO_SEONAPGUM = [
-  {feeCol:29, amtCol:28, label:'30'},  // 30% 선납
-  {feeCol:31, amtCol:30, label:'50'},  // 50% 선납
-];
-
 function transformLgNaengjanggo(rawRows, prefix, dateStr) {
+  // 선납금 컬럼 자동 감지: "30% 선납" 텍스트 위치
+  // 5월: seonapStart=28, 6월: seonapStart=20 (C21)
+  let seonapStart = 28;
+  outer_snp: for (let ri = 0; ri < Math.min(4, rawRows.length); ri++) {
+    const r = rawRows[ri];
+    for (let ci = 10; ci < r.length; ci++) {
+      const v = String(r[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) { seonapStart = ci; break outer_snp; }
+    }
+  }
+  const LG_NAENGJANGGO_SEONAPGUM = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
   const items = [];
 
   for (const row of rawRows) {
@@ -1242,7 +1252,7 @@ function transformLgNaengjanggo(rawRows, prefix, dateStr) {
                    mgmtCode:'001', visitVal, fee:feeNum, prodCat, bigo1:'' });
     }
 
-    // 선납금 (col 28~31) - 무조건 72개월/6년/029
+    // 선납금 (자동 감지 seonapStart) - 무조건 72개월/6년/029
     for (const s of LG_NAENGJANGGO_SEONAPGUM) {
       const fee = row[s.feeCol];
       const amt = row[s.amtCol];
