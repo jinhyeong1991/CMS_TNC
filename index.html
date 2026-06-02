@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -1153,18 +1153,52 @@ function exportLgXlsx(result, fileName, sheetName) {
 }
 
 // 신전산 다운로드 2 - 짧은 품목명 (기본명만)
+// 서비스타입 감지 순서: 긴 것 먼저 (라이트 플러스 > 라이트 오매칭 방지)
+const SVC_TYPE_LIST = [
+  '넷플릭스 프리미엄', '넷플릭스 스탠다드',
+  '라이트플러스', '라이트 플러스',
+  '프리미엄', '라이트',
+];
+
+function extractSvcLabel(base) {
+  for (const svc of SVC_TYPE_LIST) {
+    const esc = svc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 대괄호 패턴: [넷플릭스 프리미엄] 등
+    const bPat = new RegExp('\\s*\\[' + esc + '\\]');
+    // 소괄호 패턴: (라이트플러스) 등 - 앞에 공백 필수 (제품명 내 괄호 제외)
+    const pPat = new RegExp('\\s+\\(' + esc + '\\)');
+    if (bPat.test(base)) return { label: svc, clean: base.replace(bPat, '').trim() };
+    if (pPat.test(base)) return { label: svc, clean: base.replace(pPat, '').trim() };
+  }
+  return { label: '', clean: base };
+}
+
 function exportLgXlsxShort(result, fileName, sheetName) {
   const data = result.map(row => {
     const out = {};
+    let svcLabel = '';
+    let cleanBase = '';
+
     OUTPUT_COLS.forEach(c => {
       if (c === '품목') {
         let base = row['_baseItemName'] || row[c] || '';
-        // 모델명이 품목 앞에 붙어있으면 제거 (예: "J826GBB142.CKOR 얼정냉..." → "얼정냉...")
+        // 모델명 접두사 제거
         const model = row['모델명'] || '';
         if (model && base.startsWith(model + ' ')) base = base.slice(model.length + 1).trim();
-        out[c] = base;
+        // 서비스타입 추출 및 제거
+        const extracted = extractSvcLabel(base);
+        svcLabel = extracted.label;
+        cleanBase = extracted.clean;
+        out[c] = cleanBase;
+      } else if (c === '약정방법') {
+        const term = row[c] || '';
+        out[c] = svcLabel ? term + '_' + svcLabel : term;
+      } else if (c === '세부구분') {
+        const sub = String(row[c] || '');
+        out[c] = (sub === '027' || sub === '028') ? '004' : (sub === '029') ? '001' : sub;
+      } else {
+        out[c] = row[c] !== undefined ? row[c] : '';
       }
-      else out[c] = row[c] !== undefined ? row[c] : '';
     });
     return out;
   });
@@ -2140,9 +2174,6 @@ function LgJeongsugiConverter() {
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG정수기')}>
                 📥 신전산 엑셀 다운로드 2
               </button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>
-                📥 구전산 변환 다운로드
-              </button>
             </div>
           </div>
         </>
@@ -2303,9 +2334,6 @@ function LgNaengjanggoConverter() {
               </button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG냉장고')}>
                 📥 신전산 엑셀 다운로드 2
-              </button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>
-                📥 구전산 변환 다운로드
               </button>
             </div>
           </div>
@@ -2574,7 +2602,6 @@ function LgCookingConverter() {
               <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
               <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG쿠킹')}>📥 신전산 엑셀 다운로드</button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG쿠킹')}>📥 신전산 엑셀 다운로드 2</button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
             </div>
           </div>
         </>
@@ -2813,7 +2840,6 @@ function LgTVConverter() {
               <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
               <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LGTV')}>📥 신전산 엑셀 다운로드</button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LGTV')}>📥 신전산 엑셀 다운로드 2</button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
             </div>
           </div>
         </>
@@ -3060,7 +3086,6 @@ function LgAirConverter() {
               <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
               <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG공기청정기')}>📥 신전산 엑셀 다운로드</button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG공기청정기')}>📥 신전산 엑셀 다운로드 2</button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
             </div>
           </div>
         </>
@@ -3338,7 +3363,6 @@ function LgAirconConverter() {
               <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
               <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG에어컨')}>📥 신전산 엑셀 다운로드</button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG에어컨')}>📥 신전산 엑셀 다운로드 2</button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
             </div>
           </div>
         </>
@@ -3611,7 +3635,6 @@ function LgLivingConverter() {
               <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
               <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG리빙')}>📥 신전산 엑셀 다운로드</button>
               <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG리빙')}>📥 신전산 엑셀 다운로드 2</button>
-              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
             </div>
           </div>
         </>
