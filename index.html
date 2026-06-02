@@ -1,0 +1,4591 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>렌탈 매직 컨버터 — CMS 데이터 변환기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg:        #F4F5F7;
+      --white:     #FFFFFF;
+      --gray-1:    #F0F1F3;
+      --gray-2:    #E2E4E8;
+      --gray-3:    #B8BCC8;
+      --gray-4:    #888D9B;
+      --text:      #1A1D27;
+      --text-sub:  #555A6B;
+      --orange:    #E7580A;
+      --orange-60: rgba(231,88,10,0.55);
+      --orange-15: rgba(231,88,10,0.12);
+      --orange-08: rgba(231,88,10,0.07);
+      --red:       #DC2626;
+      --red-bg:    rgba(220,38,38,0.06);
+      --green:     #059669;
+      --green-bg:  rgba(5,150,105,0.06);
+      --blue:      #2563EB;
+      --blue-bg:   rgba(37,99,235,0.06);
+      --radius:    10px;
+      --radius-lg: 16px;
+      --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
+      --shadow:    0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.06);
+      --mono:      'IBM Plex Mono', 'Courier New', monospace;
+      --sans:      'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .hdr {
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-2);
+      padding: 0 40px;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-xs);
+      gap: 16px;
+    }
+    .hdr-brand { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+    .hdr-mark {
+      width: 38px; height: 38px;
+      background: var(--orange);
+      border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 20px; flex-shrink: 0;
+      box-shadow: 0 3px 10px var(--orange-60);
+    }
+    .hdr-title  { font-size: 17px; font-weight: 700; letter-spacing: -0.4px; }
+    .hdr-sub    { font-size: 12px; font-weight: 400; color: var(--text-sub); margin-top: 1px; }
+    .hdr-badge  {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 600; color: var(--green);
+      background: var(--green-bg);
+      border: 1px solid rgba(5,150,105,0.22);
+      border-radius: 20px; padding: 6px 14px;
+      flex-shrink: 0;
+    }
+    .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2.4s ease infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.75)} }
+
+    /* ── TAB BAR ────────────────────────────────────────────── */
+    .hdr-tabs {
+      display: flex;
+      background: var(--gray-1);
+      border: 1px solid var(--gray-2);
+      border-radius: 10px;
+      padding: 4px;
+      gap: 3px;
+    }
+    .tab-btn {
+      height: 34px; padding: 0 20px;
+      border: none; border-radius: 7px;
+      font-size: 13px; font-weight: 600;
+      font-family: var(--sans); cursor: pointer;
+      transition: all .2s;
+      background: transparent; color: var(--text-sub);
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: var(--white); color: var(--orange);
+      box-shadow: var(--shadow-xs);
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); background: rgba(0,0,0,.04); }
+
+    /* ── MAIN ───────────────────────────────────────────────── */
+    .main { max-width: 1280px; margin: 0 auto; padding: 36px 40px 100px; }
+
+    /* ── STEP BAR ───────────────────────────────────────────── */
+    .steps {
+      display: flex; align-items: center;
+      background: var(--white);
+      border: 1px solid var(--gray-2);
+      border-radius: var(--radius-lg);
+      padding: 20px 32px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-sm);
+    }
+    .step-item { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      font-size: 12px; font-weight: 700;
+      display: grid; place-items: center;
+      flex-shrink: 0; transition: all .3s ease;
+      font-family: var(--mono);
+    }
+    .step-num.done   { background: var(--green); color: #fff; }
+    .step-num.active { background: var(--orange); color: #fff; box-shadow: 0 3px 10px var(--orange-60); }
+    .step-num.idle   { background: var(--gray-2); color: var(--gray-4); }
+    .step-label { font-size: 13px; font-weight: 500; transition: color .3s ease; }
+    .step-label.active { color: var(--orange); font-weight: 700; }
+    .step-label.done   { color: var(--green); }
+    .step-label.idle   { color: var(--gray-4); }
+    .step-sep { flex: 0 0 28px; height: 1px; background: var(--gray-2); margin: 0 6px; }
+
+    /* ── LAYOUT ─────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 320px; gap: 20px; margin-bottom: 20px; }
+
+    /* ── CARD ───────────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--gray-2);
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+    .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .card-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 16px; background: var(--orange-08); flex-shrink: 0;
+    }
+    .card-title { font-size: 14px; font-weight: 700; letter-spacing: -.2px; }
+
+    /* ── DROP ZONE ──────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--gray-2);
+      border-radius: var(--radius);
+      min-height: 180px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px; cursor: pointer;
+      transition: all .25s cubic-bezier(.4,0,.2,1);
+      background: var(--gray-1);
+      position: relative; overflow: hidden;
+      text-align: center; padding: 28px 24px;
+    }
+    .drop-zone::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 50%, var(--orange-08), transparent 70%);
+      opacity: 0; transition: opacity .3s ease;
+    }
+    .drop-zone:hover::before, .drop-zone.over::before { opacity: 1; }
+    .drop-zone:hover, .drop-zone.over { border-color: var(--orange); background: var(--orange-08); }
+    .drop-zone.loaded { border-style: solid; border-color: var(--green); background: var(--green-bg); }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+    .drop-icon { font-size: 40px; animation: float 3.2s ease-in-out infinite; }
+    .drop-title { font-size: 14px; font-weight: 700; }
+    .drop-sub   { font-size: 12px; color: var(--text-sub); }
+    .drop-formats { display: flex; gap: 6px; margin-top: 4px; }
+    .fmt-tag {
+      font-family: var(--mono); font-size: 11px;
+      background: var(--white); border: 1px solid var(--gray-2);
+      border-radius: 5px; padding: 2px 8px; color: var(--text-sub);
+    }
+
+    /* ── COL MAP ────────────────────────────────────────────── */
+    .map-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--gray-2); }
+    .map-section + .map-section { margin-top: 14px; padding-top: 14px; }
+    .sec-label {
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--gray-4); margin-bottom: 10px;
+    }
+    .field-rows { display: flex; flex-direction: column; gap: 9px; }
+    .field-row { display: flex; align-items: center; gap: 8px; }
+    .field-name { font-size: 12px; font-weight: 700; color: var(--text-sub); min-width: 65px; flex-shrink: 0; }
+    .field-req  { color: var(--orange); }
+    .field-opt  { color: var(--gray-3); font-weight: 400; font-size: 11px; }
+    .field-arrow { font-family: var(--mono); font-size: 12px; color: var(--orange); flex-shrink: 0; }
+    select.fsel {
+      flex: 1; height: 34px; padding: 0 10px;
+      border: 1.5px solid var(--gray-2);
+      border-radius: 8px; font-size: 12px;
+      font-family: var(--sans);
+      background: var(--white); color: var(--text);
+      outline: none; cursor: pointer;
+      transition: border-color .2s ease;
+    }
+    select.fsel:focus { border-color: var(--orange); }
+    select.fsel.mapped { border-color: var(--green); color: var(--green); font-weight: 600; }
+    select.fsel.optional { border-style: dashed; }
+
+    /* ── REFERENCE PANEL ────────────────────────────────────── */
+    .ref-block { margin-bottom: 18px; }
+    .ref-block:last-child { margin-bottom: 0; }
+    .ref-rule-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; background: var(--gray-1);
+      border-radius: 7px; margin-bottom: 5px; font-size: 12px;
+    }
+    .ref-rule-kw  { font-family: var(--mono); font-size: 11px; color: var(--text-sub); flex: 1; }
+    .ref-rule-arr { font-family: var(--mono); font-size: 11px; color: var(--orange); flex-shrink: 0; }
+    .ref-rule-out {
+      font-weight: 700; font-size: 11px; color: var(--orange);
+      background: var(--orange-08); border: 1px solid var(--orange-15);
+      border-radius: 20px; padding: 2px 9px; flex-shrink: 0;
+    }
+    .color-scroll { max-height: 140px; overflow-y: auto; padding-right: 2px; }
+    .color-scroll::-webkit-scrollbar { width: 4px; }
+    .color-scroll::-webkit-scrollbar-thumb { background: var(--gray-2); border-radius: 2px; }
+    .color-chip-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+    .color-chip {
+      font-family: var(--mono); font-size: 10px;
+      background: var(--gray-1); border: 1px solid var(--gray-2);
+      border-radius: 5px; padding: 3px 8px; color: var(--text-sub);
+      white-space: nowrap;
+    }
+    .cat-scroll { max-height: 220px; overflow-y: auto; }
+    .cat-scroll::-webkit-scrollbar { width: 4px; }
+    .cat-scroll::-webkit-scrollbar-thumb { background: var(--gray-2); border-radius: 2px; }
+    .cat-row {
+      display: flex; gap: 6px; align-items: baseline;
+      padding: 4px 8px; border-radius: 6px; font-size: 11.5px;
+    }
+    .cat-row:hover { background: var(--gray-1); }
+    .cat-code { font-family: var(--mono); font-size: 11px; color: var(--orange); font-weight: 600; min-width: 28px; flex-shrink: 0; }
+    .cat-name { color: var(--text-sub); }
+
+    /* ── PREFIX SELECTOR ────────────────────────────────────── */
+    .prefix-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .prefix-btn {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; padding: 8px 16px;
+      border: 1.5px solid var(--gray-2); border-radius: 10px;
+      background: var(--white); cursor: pointer;
+      transition: all .2s; min-width: 88px; font-family: var(--sans);
+    }
+    .prefix-btn.active { border-color: var(--orange); background: var(--orange-08); }
+    .prefix-btn:hover:not(.active) { border-color: var(--gray-3); background: var(--gray-1); }
+    .prefix-code { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--orange); }
+    .prefix-name { font-size: 11px; color: var(--text-sub); }
+    .prefix-btn.active .prefix-name { color: var(--orange-60); }
+    .custom-prefix-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .custom-prefix-input {
+      height: 38px; width: 72px; padding: 0 10px;
+      border: 1.5px solid var(--orange); border-radius: 8px;
+      font-size: 16px; font-family: var(--mono); font-weight: 700;
+      text-transform: uppercase; text-align: center;
+      outline: none; color: var(--orange); background: var(--orange-08);
+    }
+    .date-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .date-label { font-size: 13px; font-weight: 600; color: var(--text-sub); white-space: nowrap; }
+    .date-input {
+      height: 36px; padding: 0 12px;
+      border: 1.5px solid var(--gray-2); border-radius: 8px;
+      font-size: 13px; font-family: var(--mono);
+      background: var(--white); color: var(--text);
+      outline: none; width: 110px; transition: border-color .2s;
+    }
+    .date-input:focus { border-color: var(--orange); }
+    .code-preview-box {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .code-preview {
+      font-family: var(--mono); font-size: 13px; font-weight: 700;
+      background: var(--orange-08); border: 1px solid var(--orange-15);
+      border-radius: 7px; padding: 7px 14px; color: var(--orange);
+      letter-spacing: .04em;
+    }
+    .code-preview-note { font-size: 11px; color: var(--gray-4); }
+
+    /* ── CONVERT BTN ────────────────────────────────────────── */
+    .convert-wrap { text-align: center; margin: 24px 0; }
+    .btn-convert {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--orange); color: white;
+      border: none; border-radius: var(--radius);
+      padding: 15px 44px;
+      font-size: 16px; font-weight: 700;
+      font-family: var(--sans); cursor: pointer;
+      transition: all .25s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 4px 18px var(--orange-60);
+      letter-spacing: -.3px;
+    }
+    .btn-convert:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px var(--orange-60); background: #cf5009; }
+    .btn-convert:active:not(:disabled) { transform: translateY(0); }
+    .btn-convert:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+    .convert-hint { margin-top: 10px; font-size: 13px; color: var(--gray-4); }
+
+    /* ── PREVIEW ────────────────────────────────────────────── */
+    .stat-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat-chip {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 600;
+      padding: 8px 16px; border-radius: 20px; border: 1px solid;
+    }
+    .stat-chip.all { background: var(--gray-1); border-color: var(--gray-2); color: var(--text); }
+    .stat-chip.ok  { background: var(--green-bg); border-color: rgba(5,150,105,.2); color: var(--green); }
+    .stat-chip.err { background: var(--red-bg); border-color: rgba(220,38,38,.2); color: var(--red); }
+    .stat-num { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+    .warn-box {
+      background: var(--red-bg); border: 1px solid rgba(220,38,38,.2);
+      border-radius: var(--radius); padding: 12px 16px;
+      font-size: 13px; color: var(--red); margin-bottom: 16px;
+      display: flex; align-items: flex-start; gap: 8px; line-height: 1.5;
+    }
+
+    /* ── TABLE ──────────────────────────────────────────────── */
+    .tbl-wrap {
+      border: 1px solid var(--gray-2); border-radius: var(--radius);
+      overflow: hidden; max-height: 480px; overflow-y: auto; overflow-x: auto;
+    }
+    .tbl-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    .tbl-wrap::-webkit-scrollbar-track { background: var(--gray-1); }
+    .tbl-wrap::-webkit-scrollbar-thumb { background: var(--gray-3); border-radius: 3px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th {
+      background: var(--gray-1);
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 10px; font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase; letter-spacing: .06em;
+      white-space: nowrap;
+      position: sticky; top: 0; z-index: 1;
+      border-bottom: 2px solid var(--gray-2);
+      font-family: var(--mono);
+    }
+    thead th.new-col { background: var(--orange-08); color: var(--orange); border-bottom-color: var(--orange-15); }
+    tbody td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--gray-2);
+      white-space: nowrap; max-width: 200px;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    td.mono { font-family: var(--mono); font-size: 11px; color: var(--text-sub); }
+    td.code-cell {
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      color: var(--orange); background: var(--orange-08);
+    }
+    td.eval  { color: var(--red); font-style: italic; font-size: 11px; }
+    td.rnum  { text-align: center; color: var(--gray-3); font-family: var(--mono); font-size: 11px; width: 36px; }
+    tbody tr:hover td { background: var(--gray-1); }
+    tbody tr.erow td  { background: var(--red-bg); }
+    tbody tr.erow td:first-child { border-left: 3px solid var(--red); }
+    tbody tr.erow:hover td { background: rgba(220,38,38,.08); }
+
+    /* ── ACTION BAR ─────────────────────────────────────────── */
+    .act-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--white);
+      border: 1px solid var(--gray-2);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 20px 28px; margin-top: 20px;
+    }
+    .act-info { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+    .act-info strong { color: var(--text); }
+    .act-btns { display: flex; gap: 12px; align-items: center; }
+    .btn-ghost {
+      height: 40px; padding: 0 18px;
+      background: none; border: 1.5px solid var(--gray-2);
+      border-radius: 8px; font-size: 13px;
+      font-family: var(--sans); color: var(--text-sub);
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+    .btn-dl {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 30px;
+      background: var(--orange); color: white;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700;
+      font-family: var(--sans); cursor: pointer;
+      transition: all .25s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 4px 14px var(--orange-60);
+      letter-spacing: -.2px;
+    }
+    .btn-dl:hover { background: #cf5009; transform: translateY(-2px); box-shadow: 0 8px 22px var(--orange-60); }
+
+    /* ── ANIM ───────────────────────────────────────────────── */
+    @keyframes fadein { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+    .fi   { animation: fadein .38s cubic-bezier(.4,0,.2,1) both; }
+    .fi-1 { animation-delay: .05s; }
+    .fi-2 { animation-delay: .10s; }
+
+    input[type="file"] { display: none; }
+
+    .footer {
+      text-align: center; font-size: 12px; color: var(--gray-4);
+      padding: 24px 0; margin-top: 40px;
+      border-top: 1px solid var(--gray-2);
+    }
+    .divider { height: 1px; background: var(--gray-2); margin: 14px 0; }
+
+    /* ── LG 서브탭 ──────────────────────────────────────────── */
+    .lg-subtabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      background: var(--gray-1); border: 1px solid var(--gray-2);
+      border-radius: var(--radius); padding: 4px;
+      margin-bottom: 20px;
+    }
+    .lg-subtab-btn {
+      height: 30px; padding: 0 14px;
+      border: none; border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      font-family: var(--sans); cursor: pointer;
+      transition: all .2s;
+      background: transparent; color: var(--text-sub);
+      white-space: nowrap;
+    }
+    .lg-subtab-btn.active { background: var(--white); color: var(--orange); box-shadow: var(--shadow-xs); }
+    .lg-subtab-btn.dimmed { color: var(--gray-3); cursor: default; }
+    .lg-subtab-btn:hover:not(.active):not(.dimmed) { color: var(--text); background: rgba(0,0,0,.04); }
+    .coming-soon {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 300px; gap: 12px; color: var(--gray-4); text-align: center;
+    }
+    .coming-soon-icon { font-size: 40px; }
+    .coming-soon-title { font-size: 16px; font-weight: 700; }
+    .coming-soon-sub { font-size: 13px; }
+
+    /* ── 최종본 미니 업로드 슬롯 ────────────────────────── */
+    .mini-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .mini-upload-grid { grid-template-columns: repeat(2,1fr); } }
+    .mini-slot {
+      border: 2px dashed var(--gray-2);
+      border-radius: 10px;
+      padding: 14px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .mini-slot:hover { border-color: var(--orange); background: var(--orange-08); }
+    .mini-slot.mover { border-color: var(--orange); background: var(--orange-08); }
+    .mini-slot.mloaded { border-style: solid; border-color: var(--green); background: var(--green-bg); }
+    .mini-slot-icon { font-size: 22px; margin-bottom: 5px; }
+    .mini-slot-label {
+      font-size: 12px; font-weight: 700; color: var(--text);
+      margin-bottom: 4px;
+    }
+    .mini-slot-status { font-size: 10px; color: var(--gray-4); }
+    .mini-slot.mloaded .mini-slot-status { color: var(--green); font-weight: 600; }
+    .info-box {
+      margin-top: 16px; padding: 14px 16px;
+      background: var(--blue-bg); border: 1px solid rgba(37,99,235,0.15);
+      border-radius: var(--radius); font-size: 12px;
+      color: var(--blue); line-height: 1.8;
+    }
+    .info-box strong { display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback, useRef } = React;
+
+/* ════════════════════════════════════════════════════════
+   공통 데이터 맵
+════════════════════════════════════════════════════════ */
+const COLOR_CODE_MAP = {
+  'WT':'화이트(WT)','BK':'블랙(BK)','GY':'그레이(GY)','BE':'베이지(BG)',
+  'BR':'브라운(BR)','RD':'레드(RD)','BL':'블루(BU)','PK':'핑크(PK)',
+  'SL':'실버(SL)','GN':'그린(GN)','GD':'골드(GD)','IV':'아이보리(IV)',
+  'MN':'민트(MN)','PP':'퍼플(PP)','OR':'오렌지(OR)','CR':'크림(CR)',
+  'CH':'차콜(CH)','NV':'네이비(NV)','SG':'세이지(SG)',
+  'LB':'라이트블루(LB)','LG':'라이트그레이(LG)','WG':'웜그레이(WG)',
+  'CG':'쿨그레이(CG)','GGR':'가든그레이(GGR)','PGR':'펄그레이(PGR)',
+  'DGR':'다크그레이(DGR)','BGY':'블루그레이(BGY)','RBK':'로즈블랙(RBK)',
+  'CBE':'크림베이지(BG)','LWT':'라이트화이트(LWT)','MGY':'미드그레이(MGY)',
+  'SGY':'스틸그레이(SGY)','CGY':'쿨그레이(CGY)','OW':'오이스터화이트(OW)',
+  'GR':'다크그레이(GR)','BU':'블루(BU)','BG':'베이지(BG)','SSL':'브론즈베이지(SSL)',
+};
+
+const TEXT_COLOR_MAP = [
+  {kw:'포슬린화이트',out:'포슬린화이트(WT)'},{kw:'포슬린 화이트',out:'포슬린화이트(WT)'},
+  {kw:'페블그레이',out:'그레이(GY)'},{kw:'페블 그레이',out:'그레이(GY)'},
+  {kw:'가든그레이',out:'가든그레이(GGR)'},{kw:'가든 그레이',out:'가든그레이(GGR)'},
+  {kw:'클라우드화이트',out:'클라우드화이트'},{kw:'클라우드 화이트',out:'클라우드화이트'},
+  {kw:'라이트그레이',out:'라이트그레이(LG)'},{kw:'라이트 그레이',out:'라이트그레이(LG)'},
+  {kw:'웜그레이',out:'웜그레이(WG)'},{kw:'웜 그레이',out:'웜그레이(WG)'},
+  {kw:'쿨그레이',out:'쿨그레이(CG)'},{kw:'쿨 그레이',out:'쿨그레이(CG)'},
+  {kw:'블루그레이',out:'블루그레이(BGY)'},{kw:'블루 그레이',out:'블루그레이(BGY)'},
+  {kw:'다크그레이',out:'다크그레이(DGR)'},{kw:'다크 그레이',out:'다크그레이(DGR)'},
+  {kw:'크림베이지',out:'크림베이지(BG)'},{kw:'크림 베이지',out:'크림베이지(BG)'},
+  {kw:'로즈블랙',out:'로즈블랙(RBK)'},{kw:'로즈 블랙',out:'로즈블랙(RBK)'},
+  {kw:'미드그레이',out:'미드그레이(MGY)'},{kw:'미드 그레이',out:'미드그레이(MGY)'},
+  {kw:'스틸그레이',out:'스틸그레이(SGY)'},{kw:'스틸 그레이',out:'스틸그레이(SGY)'},
+  {kw:'오이스터화이트',out:'오이스터화이트(OW)'},{kw:'오이스터 화이트',out:'오이스터화이트(OW)'},
+  {kw:'아이언실버',out:'아이언실버'},{kw:'아이언 실버',out:'아이언실버'},
+  {kw:'페블블랙',out:'페블블랙'},{kw:'페블 블랙',out:'페블블랙'},
+  {kw:'브론즈베이지',out:'브론즈베이지(SSL)'},{kw:'브론즈 베이지',out:'브론즈베이지(SSL)'},
+  {kw:'아이스화이트',out:'아이스화이트'},{kw:'아이스 화이트',out:'아이스화이트'},
+  {kw:'아이스핑크',out:'아이스핑크'},{kw:'아이스 핑크',out:'아이스핑크'},
+  {kw:'아이스블루',out:'아이스블루'},{kw:'아이스 블루',out:'아이스블루'},
+  {kw:'아이스그레이',out:'아이스그레이'},{kw:'아이스 그레이',out:'아이스그레이'},
+  {kw:'아이스베이지',out:'아이스베이지'},{kw:'아이스 베이지',out:'아이스베이지'},
+  {kw:'민트그린',out:'민트그린'},{kw:'민트 그린',out:'민트그린'},
+  {kw:'미네랄블루',out:'미네랄블루'},{kw:'미네랄 블루',out:'미네랄블루'},
+  {kw:'블러썸핑크',out:'블러썸핑크'},{kw:'블러썸 핑크',out:'블러썸핑크'},
+  {kw:'아이보리',out:'아이보리(IV)'},
+  {kw:'차콜',out:'차콜(CH)'},
+  {kw:'네이비',out:'네이비(NV)'},
+  {kw:'민트',out:'민트(MN)'},
+  {kw:'퍼플',out:'퍼플(PP)'},
+  {kw:'골드',out:'골드(GD)'},
+  {kw:'실버',out:'실버(SL)'},
+  {kw:'브라운',out:'브라운(BR)'},
+  {kw:'베이지',out:'베이지(BG)'},
+  {kw:'그레이',out:'그레이(GY)'},
+  {kw:'블랙',out:'블랙(BK)'},
+  {kw:'화이트',out:'화이트(WT)'},
+  {kw:'레드',out:'레드(RD)'},
+  {kw:'블루',out:'블루(BU)'},
+  {kw:'핑크',out:'핑크(PK)'},
+  {kw:'그린',out:'그린(GN)'},
+  {kw:'크림',out:'크림(CR)'},
+  {kw:'세이지',out:'세이지(SG)'},
+];
+
+const PRODUCT_CATEGORY = [
+  {kw:['얼음정수기'],code:'041'},
+  {kw:['공기청정기','청정기','공청기'],code:'002'},
+  {kw:['김치냉장고','김치 냉장고'],code:'032'},
+  {kw:['흙돌침대'],code:'043'},
+  {kw:['모션배드','모션베드','모션 베드'],code:'039'},
+  {kw:['식물재배기','식물 재배기'],code:'016'},
+  {kw:['음식물처리기','음식물 처리기'],code:'021'},
+  {kw:['식기세척기','식기 세척기'],code:'008'},
+  {kw:['이온수기'],code:'007'},
+  {kw:['연수기'],code:'014'},
+  {kw:['냉난방기'],code:'038'},
+  {kw:['에어드레서'],code:'062'},
+  {kw:['의류청정기'],code:'065'},
+  {kw:['정수기'],code:'001'},
+  {kw:['에어컨'],code:'034'},
+  {kw:['커피머신','에스프레소'],code:'015'},
+  {kw:['냉장고'],code:'031'},
+  {kw:['냉동고'],code:'063'},
+  {kw:['세탁기','워시타워'],code:'033'},
+  {kw:['건조기'],code:'009'},
+  {kw:['안마의자'],code:'004'},
+  {kw:['승마기'],code:'013'},
+  {kw:['제빙기'],code:'005'},
+  {kw:['제습기'],code:'018'},
+  {kw:['살균기'],code:'073'},
+  {kw:['가습기'],code:'088'},
+  {kw:['환기청정기','환기청정','환기 청정'],code:'079'},
+  {kw:['오븐','레인지'],code:'006'},
+  {kw:['비데'],code:'003'},
+  {kw:['청소기'],code:'035'},
+  {kw:['스타일러'],code:'012'},
+  {kw:['러닝머신','헬스기기'],code:'066'},
+  {kw:['마사지기','안마기'],code:'042'},
+  {kw:['리클라이너'],code:'059'},
+  {kw:['TV','티비','모니터'],code:'030'},
+  {kw:['노트북','PC','컴퓨터'],code:'040'},
+  {kw:['와인셀러','와인저장고'],code:'084'},
+  {kw:['침대프레임'],code:'083'},
+  {kw:['침대세트'],code:'089'},
+  {kw:['침대'],code:'044'},
+  {kw:['매트리스','메트리스'],code:'010'},
+  {kw:['소파'],code:'046'},
+  {kw:['식탁'],code:'045'},
+  {kw:['가구'],code:'036'},
+  {kw:['반려용품'],code:'064'},
+  {kw:['유아용품'],code:'037'},
+  {kw:['뷰티','헤어'],code:'019'},
+  {kw:['보일러'],code:'096'},
+  {kw:['난방기'],code:'091'},
+  {kw:['사무기기'],code:'061'},
+  {kw:['빔프로젝터','사운드바'],code:'069'},
+  {kw:['게임기'],code:'070'},
+  {kw:['카메라'],code:'072'},
+  {kw:['라이트테라피','테라피'],code:'074'},
+  {kw:['타이어'],code:'080'},
+  {kw:['의료기기'],code:'081'},
+  {kw:['자전거','전기자전거'],code:'068'},
+  {kw:['슈케어'],code:'095'},
+  {kw:['해충방제'],code:'093'},
+];
+
+const CATEGORY_ALL = [
+  {code:'001',name:'정수기'},{code:'002',name:'공기청정기'},{code:'003',name:'비데'},
+  {code:'004',name:'안마의자'},{code:'005',name:'제빙기'},{code:'006',name:'오븐/레인지'},
+  {code:'007',name:'이온수기'},{code:'008',name:'식기세척기'},{code:'009',name:'건조기'},
+  {code:'010',name:'매트리스'},{code:'012',name:'스타일러'},{code:'013',name:'승마기'},
+  {code:'014',name:'연수기'},{code:'015',name:'커피머신'},{code:'016',name:'식물재배기'},
+  {code:'018',name:'제습기'},{code:'019',name:'뷰티/헤어'},{code:'020',name:'기타/취미용품'},
+  {code:'021',name:'음식물처리기'},{code:'030',name:'TV/모니터'},{code:'031',name:'냉장고'},
+  {code:'032',name:'김치냉장고'},{code:'033',name:'세탁기/워시타워'},{code:'034',name:'에어컨'},
+  {code:'035',name:'청소기'},{code:'036',name:'가구'},{code:'037',name:'유아용품'},
+  {code:'038',name:'냉난방기'},{code:'039',name:'모션배드'},{code:'040',name:'PC/노트북'},
+  {code:'041',name:'얼음정수기'},{code:'042',name:'마사지/바디'},{code:'043',name:'흙돌침대'},
+  {code:'044',name:'침대'},{code:'045',name:'식탁'},{code:'046',name:'소파'},
+  {code:'047',name:'생활가전'},{code:'048',name:'건강관리'},{code:'059',name:'리클라이너'},
+  {code:'060',name:'홈케어서비스'},{code:'061',name:'사무기기'},{code:'062',name:'에어드레서'},
+  {code:'063',name:'냉동고'},{code:'064',name:'반려용품'},{code:'065',name:'의류청정기'},
+  {code:'066',name:'헬스/러닝머신'},{code:'067',name:'디지털/AI'},{code:'068',name:'차량/전기자전거'},
+  {code:'069',name:'빔/사운드바'},{code:'070',name:'게임기'},{code:'071',name:'주방가전'},
+  {code:'072',name:'카메라'},{code:'073',name:'살균기/바이러스'},{code:'074',name:'라이트테라피'},
+  {code:'079',name:'환기청정/환경'},{code:'080',name:'타이어'},{code:'081',name:'의료기기'},
+  {code:'082',name:'결합상품'},{code:'083',name:'침대프레임'},{code:'084',name:'와인셀러/저장고'},
+  {code:'085',name:'인터넷&IPTV'},{code:'086',name:'상조'},{code:'088',name:'가습기'},
+  {code:'089',name:'침대세트'},{code:'090',name:'인터넷'},{code:'091',name:'난방기'},
+  {code:'092',name:'파운데이션'},{code:'093',name:'해충방제'},{code:'094',name:'제습기'},
+  {code:'095',name:'슈케어'},{code:'096',name:'보일러'},{code:'999',name:'단종 및 일시중단'},
+];
+
+const OUTPUT_COLS = ['제품코드','품목','모델명','색상','제품구분','관리방법','세부구분','약정방법','의무','렌탈료','방문주기','프로모션','비고1','비고2'];
+
+/* ════════════════════════════════════════════════════════
+   공통 유틸
+════════════════════════════════════════════════════════ */
+function getBaseModel(m) {
+  return m.replace(/_[A-Z]{2,6}$/, '').trim();
+}
+function getModelColor(m) {
+  const mat = m.match(/_([A-Z]{2,6})$/);
+  if (!mat) return '';
+  return COLOR_CODE_MAP[mat[1]] || '';
+}
+function detectTextColors(text) {
+  const found = [];
+  let remaining = text;
+  for (const {kw, out} of TEXT_COLOR_MAP) {
+    if (remaining.includes(kw)) {
+      if (!found.includes(out)) found.push(out);
+      remaining = remaining.split(kw).join(' ');
+    }
+  }
+  return found;
+}
+function detectCategory(text) {
+  for (const {kw,code} of PRODUCT_CATEGORY) {
+    if (kw.some(k => text.includes(k))) return code;
+  }
+  return '020';
+}
+const SELF_SERVICE_KW = ['자가', '셀프', '서비스프리', '자가관리'];
+function cleanItemName(raw) {
+  let n = (raw || '').toString();
+  n = n.replace(/^[\s★☆●◆■▲▶►◎○△→←↑↓※·•·]+/, '');
+  n = n.replace(/\d+\s*[mM]방문\s*(\([^)]*\))?/g, ' ');
+  n = n.replace(/방문\s*(\([^)]*\))?/g, ' ');
+  n = n.replace(/자가관리\s*(\([^)]*\))?/g, ' ');
+  n = n.replace(/\(?\d+\s*년\)?\s*/g, ' ');
+  let prev;
+  do { prev = n; n = n.replace(/\(\s*\)/g, ' '); } while (n !== prev);
+  for (const {kw} of TEXT_COLOR_MAP) {
+    if (n.includes(kw)) n = n.split(kw).join(' ');
+  }
+  return n.replace(/\s+/g, ' ').trim();
+}
+
+/* ════════════════════════════════════════════════════════
+   가전종합 전용 유틸
+════════════════════════════════════════════════════════ */
+const RENTAL_PREFIXES = [
+  {code:'SM', name:'스마트렌탈'},
+  {code:'BS', name:'비에스렌탈'},
+  {code:'WE', name:'위더스렌탈'},
+  {code:'KT', name:'KT렌탈'},
+];
+
+function getTodayDateStr() {
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return yy + mm + dd;
+}
+
+function stripRentalPeriod(name) {
+  let n = (name || '').toString();
+  n = n.replace(/\s*\(\s*\d{2,}\s*\)\s*$/, '');
+  n = n.replace(/_\d{2,}\s*$/, '');
+  return n.trim();
+}
+
+/* ════════════════════════════════════════════════════════
+   코웨이 핵심 파싱
+════════════════════════════════════════════════════════ */
+function parseRow(row, colMap) {
+  const modelRaw = String(row[colMap.model] || '').trim();
+  const pName    = String(row[colMap.name]  || '').trim();
+
+  const baseModel  = getBaseModel(modelRaw);
+  const modelColor = getModelColor(modelRaw);
+
+  let itemName   = pName;
+  let mgmtCode   = '001';
+  let subCode    = '023';
+  let contract   = '';
+  let contractMo = '';
+  let visitCycle = '';
+  let promo      = '';
+  const textColors = [];
+
+  if (pName.includes('타사보상')) subCode = '008';
+  if (SELF_SERVICE_KW.some(kw => pName.includes(kw))) mgmtCode = '002';
+
+  const slashIdx = pName.indexOf('/');
+  const baseText = slashIdx >= 0 ? pName.substring(0, slashIdx).trim() : pName;
+  if (slashIdx >= 0) promo = pName.substring(slashIdx + 1).trim();
+
+  if (baseText.includes('_')) {
+    const parts = baseText.split('_');
+    itemName = cleanItemName(parts[0]);
+    for (const part of parts.slice(1)) {
+      const p = part.trim();
+      if (!p) continue;
+      const yearM  = p.match(/(\d+)\s*년/);
+      const visitM = p.match(/(\d+)\s*[mM]방문/);
+      const pColors = detectTextColors(p);
+      if (yearM && !contract) {
+        const yrs = parseInt(yearM[1], 10);
+        contract   = `${yrs}년의무`;
+        contractMo = yrs * 12;
+      }
+      if (visitM && !visitCycle) visitCycle = `${visitM[1]}개월`;
+      pColors.forEach(c => { if (!textColors.includes(c)) textColors.push(c); });
+    }
+    detectTextColors(parts[0]).forEach(c => { if (!textColors.includes(c)) textColors.push(c); });
+  } else {
+    const yearM  = baseText.match(/(\d+)\s*년/);
+    const visitM = baseText.match(/(\d+)\s*[mM]방문/);
+    if (yearM) {
+      const yrs  = parseInt(yearM[1], 10);
+      contract   = `${yrs}년의무`;
+      contractMo = yrs * 12;
+    }
+    if (visitM) visitCycle = `${visitM[1]}개월`;
+    itemName = cleanItemName(baseText);
+    detectTextColors(baseText).forEach(c => { if (!textColors.includes(c)) textColors.push(c); });
+  }
+
+  const prodCat = detectCategory(itemName || pName);
+  const colorSet = new Set();
+  if (modelColor) colorSet.add(modelColor);
+  textColors.forEach(c => colorSet.add(c));
+
+  const errors = [];
+  if (!contract) errors.push('약정');
+
+  return {
+    _baseModel:  baseModel,
+    _rowColors:  [...colorSet],
+    _hasError:   errors.length > 0,
+    _errFields:  errors,
+    _itemName:   itemName,
+    _mgmtCode:   mgmtCode,
+    _subCode:    subCode,
+    _contract:   contract,
+    _contractMo: contractMo,
+    _visitCycle: visitCycle,
+    _promo:      promo,
+    _prodCat:    prodCat,
+  };
+}
+
+/* ════════════════════════════════════════════════════════
+   코웨이 2-pass 변환
+════════════════════════════════════════════════════════ */
+function transform(rows, colMap) {
+  const parsed = rows.map(row => ({ ...row, ...parseRow(row, colMap) }));
+
+  const modelColorMap = new Map();
+  parsed.forEach(row => {
+    const b = row._baseModel;
+    if (!modelColorMap.has(b)) modelColorMap.set(b, new Set());
+    row._rowColors.forEach(c => modelColorMap.get(b).add(c));
+  });
+
+  const modelGroups = new Map();
+  parsed.forEach(row => {
+    const b = row._baseModel;
+    if (!modelGroups.has(b)) modelGroups.set(b, []);
+    modelGroups.get(b).push(row);
+  });
+
+  const result = [];
+  modelGroups.forEach(grp => {
+    const firstCode = grp[0][colMap.code] || '';
+    let allColorsArr = [...(modelColorMap.get(grp[0]._baseModel) || [])];
+    if (allColorsArr.some(c => c !== '화이트(WT)' && c.includes('화이트')))
+      allColorsArr = allColorsArr.filter(c => c !== '화이트(WT)');
+    if (allColorsArr.some(c => c !== '블랙(BK)' && c.includes('블랙')))
+      allColorsArr = allColorsArr.filter(c => c !== '블랙(BK)');
+    if (allColorsArr.some(c => c !== '실버(SL)' && c.includes('실버')))
+      allColorsArr = allColorsArr.filter(c => c !== '실버(SL)');
+    if (allColorsArr.includes('베이지(BG)'))
+      allColorsArr = allColorsArr.filter(c => c !== '크림베이지(BG)');
+    const allColors = allColorsArr.join(',');
+
+    grp.forEach(row => {
+      let contractMo = row._contractMo;
+      let contract   = row._contract;
+      if (colMap.mandatory) {
+        const mandatoryVal = Number(row[colMap.mandatory] || 0);
+        if (mandatoryVal > 0) {
+          contractMo = mandatoryVal;
+          contract   = `${Math.round(mandatoryVal / 12)}년의무`;
+        }
+      }
+
+      let itemName = row._itemName || row._baseModel;
+      let prodCat  = row._prodCat;
+
+      if (colMap.group) {
+        const groupVal = String(row[colMap.group] || '').trim();
+        if (groupVal && prodCat === '020') {
+          const detectedCat = detectCategory(groupVal);
+          if (detectedCat !== '020') {
+            prodCat = detectedCat;
+            const catEntry = CATEGORY_ALL.find(c => c.code === detectedCat);
+            const catName  = catEntry ? catEntry.name : groupVal;
+            if (!itemName.includes(catName)) itemName = (itemName + ' ' + catName).trim();
+          }
+        }
+      }
+
+      let visitVal = colMap.visit
+        ? (String(row[colMap.visit] || '') || row._visitCycle)
+        : row._visitCycle;
+      if (!visitVal) visitVal = '관리없음';
+
+      result.push({
+        '제품코드': firstCode,
+        '품목':     itemName,
+        '모델명':   row._baseModel,
+        '색상':     allColors,
+        '제품구분': prodCat,
+        '관리방법': row._mgmtCode,
+        '세부구분': row._subCode,
+        '약정방법': contract,
+        '의무':     contractMo,
+        '렌탈료':   colMap.fee   ? (row[colMap.fee]   ?? '') : '',
+        '방문주기': visitVal,
+        '프로모션': row._promo,
+        '비고1':    colMap.note1 ? (row[colMap.note1] ?? '') : '',
+        '비고2':    colMap.note2 ? (row[colMap.note2] ?? '') : '',
+        _hasError:  !contract,
+        _errFields: !contract ? ['약정'] : [],
+      });
+    });
+  });
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function exportXlsx(result, fileName) {
+  const data = result.map(row => {
+    const out = {};
+    OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '신전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_신전산.xlsx'));
+}
+
+/* ════════════════════════════════════════════════════════
+   가전종합 변환
+════════════════════════════════════════════════════════ */
+function transformGaJeon(rows, colMap, prefix, dateStr) {
+  if (!rows.length) return [];
+
+  const modelItemNameMap = new Map();
+  const modelSeqMap = new Map();
+  let seqCounter = 0;
+
+  rows.forEach(row => {
+    const model = String(row[colMap.model] || '').trim();
+    if (model && !modelItemNameMap.has(model)) {
+      seqCounter++;
+      modelSeqMap.set(model, seqCounter);
+      const rawName = String(row[colMap.name] || '').trim();
+      modelItemNameMap.set(model, stripRentalPeriod(rawName));
+    }
+  });
+
+  const result = [];
+  rows.forEach(row => {
+    const model   = String(row[colMap.model] || '').trim();
+    const rawName = String(row[colMap.name]  || '').trim();
+    if (!model) return;
+
+    const itemName  = modelItemNameMap.get(model) || stripRentalPeriod(rawName);
+    const seqNum    = String(modelSeqMap.get(model) || 1).padStart(3, '0');
+    const prodCode  = `${prefix}${dateStr}${seqNum}`;
+
+    // 관리방법
+    let mgmtCode = '001';
+    if (colMap.mgmt) {
+      const mgmtVal = String(row[colMap.mgmt] || '').trim();
+      if (mgmtVal === '002') mgmtCode = '002';
+      else if (['자가','셀프','자가관리','서비스프리'].some(kw => mgmtVal.includes(kw))) mgmtCode = '002';
+    }
+
+    // 세부구분
+    const subCode = rawName.includes('타사보상') ? '008' : '001';
+
+    // 제품구분
+    let prodCat = detectCategory(itemName);
+    if (prodCat === '020' && colMap.group) {
+      const groupVal = String(row[colMap.group] || '').trim();
+      if (groupVal) {
+        const det = detectCategory(groupVal);
+        if (det !== '020') prodCat = det;
+      }
+    }
+
+    // 약정방법: 의무기간(월) ÷ 12 = N년의무, 의무는 원본값 그대로
+    let contractStr = '';
+    let contractMo  = '';
+    if (colMap.mandatory) {
+      const mv = Number(row[colMap.mandatory] || 0);
+      if (mv > 0) {
+        const years = Math.round(mv / 12);
+        contractStr = `${years}년의무`;
+        contractMo  = mv;
+      }
+    }
+
+    result.push({
+      '제품코드': prodCode,
+      '품목':     itemName,
+      '모델명':   model,
+      '색상':     '',
+      '제품구분': prodCat,
+      '관리방법': mgmtCode,
+      '세부구분': subCode,
+      '약정방법': contractStr,
+      '의무':     contractMo,
+      '렌탈료':   colMap.fee ? (row[colMap.fee] ?? '') : '',
+      '방문주기': '',
+      '프로모션': '',
+      '비고1':    '',
+      '비고2':    '',
+      _hasError:  !!(colMap.mandatory && !contractStr),
+      _errFields: (colMap.mandatory && !contractStr) ? ['약정'] : [],
+    });
+  });
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function exportGaJeonXlsx(result, fileName) {
+  const data = result.map(row => {
+    const out = {};
+    OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '신전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_신가전종합.xlsx'));
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 정수기 파싱
+════════════════════════════════════════════════════════ */
+function parseModelCodes(str) {
+  str = (str || '').toString().trim();
+  if (!str) return [];
+  // WD722R(K/H/E) → [WD722RK, WD722RH, WD722RE]
+  // WU923A(C/W/N/B)B → [WU923ACB, WU923AWB, WU923ANB, WU923ABB]
+  const pm = str.match(/^(.*?)\(([^)]+)\)(.*?)$/);
+  if (pm) {
+    const pre = pm[1], post = pm[3];
+    return pm[2].split('/').map(v => pre + v.trim() + post);
+  }
+  // WD525AHB/WD525ACB/WD525AGB/WD525AS → split by /
+  if (str.includes('/')) return str.split('/').map(s => s.trim()).filter(Boolean);
+  return [str];
+}
+
+function parseColors(str) {
+  str = (str || '').toString().trim();
+  if (!str || str === '-') return [];
+  return str.split('/').map(s => s.trim()).filter(Boolean);
+}
+
+// 일반 구간: 6년(col11~13) / 5년(col14~16) / 4년(col17~19)
+const LG_REGULAR = [
+  {months:72, year:6, fees:[{col:11,sub:'001'},{col:12,sub:'027'},{col:13,sub:'028'}]},
+  {months:60, year:5, fees:[{col:14,sub:'001'},{col:15,sub:'027'},{col:16,sub:'028'}]},
+  {months:48, year:4, fees:[{col:17,sub:'001'},{col:18,sub:'027'},{col:19,sub:'028'}]},
+];
+// 특수 구간(WD523ACB/WD520ACB): 1년차 무시, 2~6년차(col14~16) / 2~5년차(col20~22)
+const LG_SPECIAL = [
+  {months:72, year:6, fees:[{col:14,sub:'001'},{col:15,sub:'027'},{col:16,sub:'028'}]},
+  {months:60, year:5, fees:[{col:20,sub:'001'},{col:21,sub:'027'},{col:22,sub:'028'}]},
+];
+
+// 신전산 품목명 포맷: {기본명} [{색상}] {N}년의무 ({방문}방문) ({결합})
+function buildLgItemName(base, color, year, visitVal, sub) {
+  const bindLabel = sub === '001' ? '일반'
+    : sub === '027' ? '신규결합'
+    : sub === '028' ? '기존결합'
+    : sub === '029' ? '선납금'
+    : sub;
+  const visitLabel = visitVal === '관리없음' ? '자가관리'
+    : visitVal.replace(/(\d+)개월/, '$1개월방문');
+  const colorPart = (color && color.trim()) ? ` [${color.trim()}]` : '';
+  return `${base}${colorPart} ${year}년의무 (${visitLabel}) (${bindLabel})`;
+}
+
+function transformLgJeongsugi(rawRows, prefix, dateStr) {
+  let periods = LG_REGULAR;
+  const items = [];
+
+  for (const row of rawRows) {
+    const c0  = String(row[0]  || '').trim();
+    const c11 = String(row[11] || '').trim();
+
+    if (c0 === '제품군')  continue;            // 헤더행 스킵
+    if (c11 === '단품')   { periods = LG_REGULAR;  continue; } // 일반 구간
+    if (c11 === '1년차')  { periods = LG_SPECIAL;  continue; } // 특수 구간
+    if (!c0 || !row[5])   continue;            // 빈 행 스킵
+
+    const 라인업   = String(row[1] || '').trim();
+    const 구분2   = String(row[3] || '').trim();
+    const 판매코드 = String(row[5] || '').trim();
+    const suffix   = String(row[6] || '').trim(); // G열: CSMS 등록 suffix (.AKOR 등)
+    const 방문raw  = String(row[7] || '').trim();
+
+    if (!판매코드) continue;
+
+    const models = parseModelCodes(판매코드);
+    const colors = parseColors(구분2);
+    if (!models.length) continue;
+
+    const isJaga   = 방문raw.toLowerCase() === '자가';
+    const visitVal = isJaga ? '관리없음' : `${방문raw}개월`;
+    const mgmtCode = isJaga ? '002' : '001';
+    const itemName = `${라인업} ${c0}`.trim();
+
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i] + suffix; // suffix(.AKOR) 포함한 완전한 CSMS 모델코드
+      const color = colors[i] !== undefined ? colors[i] : (colors[0] || '');
+
+      for (const period of periods) {
+        for (const {col, sub} of period.fees) {
+          const fee = row[col];
+          if (fee === '' || fee === null || fee === undefined) continue;
+          const feeNum = Number(fee);
+          if (isNaN(feeNum) || feeNum <= 0) continue;
+
+          items.push({ model, color, itemName, months: period.months, year: period.year, sub, mgmtCode, visitVal, fee: feeNum });
+        }
+      }
+    }
+  }
+
+  // 모델별 순번 배정 (동일 모델 = 동일 끝 3자리)
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     r.color,
+    '제품구분': r.itemName.includes('얼음') ? '041' : '001',
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    '',
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function exportLgXlsx(result, fileName, sheetName) {
+  const data = result.map(row => {
+    const out = {};
+    OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || '신전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_LG신전산.xlsx'));
+}
+
+// 신전산 다운로드 2 - 짧은 품목명 (기본명만)
+function exportLgXlsxShort(result, fileName, sheetName) {
+  const data = result.map(row => {
+    const out = {};
+    OUTPUT_COLS.forEach(c => {
+      if (c === '품목') out[c] = row['_baseItemName'] || row[c] || '';
+      else out[c] = row[c] !== undefined ? row[c] : '';
+    });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || '신전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_LG신전산2.xlsx'));
+}
+
+function exportLgXlsxSplit(result, fileName, sheetName, chunkSize) {
+  const size = chunkSize || 5000;
+  const total = Math.ceil(result.length / size);
+  const base = fileName.replace(/\.(xlsx|xls|csv)$/i, '');
+  for (let i = 0; i < total; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        const chunk = result.slice(idx * size, (idx + 1) * size);
+        const data = chunk.map(row => {
+          const out = {};
+          OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+          return out;
+        });
+        const ws = XLSX.utils.json_to_sheet(data, { header: OUTPUT_COLS });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName || '신전산');
+        XLSX.writeFile(wb, `${base}_${String(idx+1).padStart(3,'0')}of${String(total).padStart(3,'0')}.xlsx`);
+      }, idx * 700);
+    })(i);
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 냉장고(김냉포함) 파싱
+════════════════════════════════════════════════════════ */
+const LG_NAENGJANGGO_FEES = [
+  {months:36, year:3, col:12, sub:'001'},  // 36개월 구독료
+  {months:48, year:4, col:13, sub:'001'},  // 48개월 구독료
+  {months:48, year:4, col:14, sub:'027'},  // 48개월 신규결합
+  {months:60, year:5, col:15, sub:'001'},  // 60개월 구독료
+  {months:60, year:5, col:16, sub:'027'},  // 60개월 신규결합
+  {months:72, year:6, col:17, sub:'001'},  // 72개월 구독료
+  {months:72, year:6, col:18, sub:'027'},  // 72개월 신규결합
+  {months:72, year:6, col:19, sub:'028'},  // 72개월 기존결합
+];
+const LG_NAENGJANGGO_SEONAPGUM = [
+  {feeCol:29, amtCol:28, label:'30'},  // 30% 선납
+  {feeCol:31, amtCol:30, label:'50'},  // 50% 선납
+];
+
+function transformLgNaengjanggo(rawRows, prefix, dateStr) {
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군    = String(row[1] || '').trim();
+    const 구분1    = String(row[2] || '').trim();
+    const 서비스타입 = String(row[5] || '').trim();
+
+    if (!구분1 || !제품군 || !서비스타입) continue;
+    const 방문Num = Number(row[4]);
+    if (isNaN(방문Num) || 방문Num <= 0) continue;
+
+    const visitVal = `${방문Num}개월`;
+    const prodCat  = 제품군.includes('김치') ? '032' : '031';
+    // 제품군에 '냉장고'가 포함되면 뒤에 안 붙임 (김치냉장고, 냉장고 모두 포함)
+    const appendSuffix = !제품군.includes('냉장고');
+    const itemName = `${구분1} ${제품군} [${서비스타입}]${appendSuffix ? ' 냉장고' : ''}`;
+
+    // 일반 렌탈료 (col 12~19)
+    for (const f of LG_NAENGJANGGO_FEES) {
+      const fee = row[f.col];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      items.push({ model:구분1, itemName, months:f.months, year:f.year, sub:f.sub,
+                   mgmtCode:'001', visitVal, fee:feeNum, prodCat, bigo1:'' });
+    }
+
+    // 선납금 (col 28~31) - 무조건 72개월/6년/029
+    for (const s of LG_NAENGJANGGO_SEONAPGUM) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:구분1, itemName, months:72, year:6, sub:'029',
+                   mgmtCode:'001', visitVal, fee:feeNum, prodCat, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': r.prodCat,
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/* ════════════════════════════════════════════════════════
+   공통 컴포넌트
+════════════════════════════════════════════════════════ */
+function StepBar({ phase }) {
+  const STEPS = [
+    {id:'upload',label:'파일 업로드'},
+    {id:'configure',label:'컬럼 매핑'},
+    {id:'preview',label:'미리보기'},
+    {id:'done',label:'다운로드'},
+  ];
+  const ORD = {upload:0,configure:1,preview:2,done:3};
+  const cur = ORD[phase] ?? 0;
+  return (
+    <div className="steps">
+      {STEPS.map((s, i) => {
+        const idx = ORD[s.id];
+        const st = idx < cur ? 'done' : idx === cur ? 'active' : 'idle';
+        return (
+          <React.Fragment key={s.id}>
+            <div className="step-item">
+              <div className={`step-num ${st}`}>{st==='done'?'✓':i+1}</div>
+              <span className={`step-label ${st}`}>{s.label}</span>
+            </div>
+            {i < STEPS.length-1 && <div className="step-sep" />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function DropZone({ onFile, fileName, rowCount, label }) {
+  const [over, setOver] = useState(false);
+  const inputRef = useRef();
+
+  const readFile = useCallback((file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 업로드할 수 있습니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, {defval:''});
+        if (!json.length) { alert('데이터가 없습니다.'); return; }
+        onFile(file.name, json);
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }, [onFile]);
+
+  const loaded = rowCount > 0;
+  return (
+    <div
+      className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+      onDragOver={e=>{e.preventDefault();setOver(true);}}
+      onDragLeave={()=>setOver(false)}
+      onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+      onClick={()=>inputRef.current?.click()}
+    >
+      <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+      {loaded ? (
+        <>
+          <div className="drop-icon">✅</div>
+          <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+          <div className="drop-sub">{rowCount.toLocaleString()}행 로드 완료 · 클릭하여 재업로드</div>
+        </>
+      ) : (
+        <>
+          <div className="drop-icon">📊</div>
+          <div className="drop-title">{label || '구전산 파일을 이곳에 끌어다 놓으세요'}</div>
+          <div className="drop-sub">또는 클릭하여 파일 선택</div>
+          <div className="drop-formats">
+            <span className="fmt-tag">.xlsx</span>
+            <span className="fmt-tag">.xls</span>
+            <span className="fmt-tag">.csv</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PreviewTable({ result, warnLabel }) {
+  const errCount = result.filter(r=>r._hasError).length;
+  const okCount  = result.length - errCount;
+  const isErrCell = (row, col) => {
+    if (!row._hasError) return false;
+    if (col==='약정방법') return row._errFields && row._errFields.includes('약정');
+    if (col==='의무')     return row._errFields && row._errFields.includes('약정');
+    return false;
+  };
+  const CODE_COLS = new Set(['제품구분','관리방법','세부구분']);
+  return (
+    <div className="card fi">
+      <div className="card-head">
+        <div className="card-icon">📋</div>
+        <span className="card-title">변환 미리보기</span>
+      </div>
+      <div className="stat-row">
+        <div className="stat-chip all">
+          <span>전체</span><span className="stat-num">{result.length.toLocaleString()}</span><span>행</span>
+        </div>
+        <div className="stat-chip ok">
+          <span>✓</span><span className="stat-num">{okCount.toLocaleString()}</span><span>성공</span>
+        </div>
+        {errCount > 0 && (
+          <div className="stat-chip err">
+            <span>⚠</span><span className="stat-num">{errCount.toLocaleString()}</span>
+            <span>{warnLabel || '약정 미감지'}</span>
+          </div>
+        )}
+      </div>
+      {errCount > 0 && (
+        <div className="warn-box">
+          <span>⚠️</span>
+          <span>
+            <strong>{errCount}행</strong>에서 {warnLabel || '약정기간'}을 감지하지 못했습니다.
+            붉은 행을 확인 후 수동으로 보정하세요.
+          </span>
+        </div>
+      )}
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{textAlign:'center',width:36}}>#</th>
+              {OUTPUT_COLS.map(c => (
+                <th key={c} className={CODE_COLS.has(c)?'new-col':''}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {result.map((row, i) => (
+              <tr key={i} className={row._hasError?'erow':''}>
+                <td className="rnum">{i+1}</td>
+                {OUTPUT_COLS.map(c => {
+                  const val = row[c] !== undefined ? String(row[c]) : '';
+                  const cls = isErrCell(row,c) ? 'eval'
+                            : CODE_COLS.has(c)  ? 'code-cell'
+                            : 'mono';
+                  return (
+                    <td key={c} className={cls} title={val}>
+                      {isErrCell(row,c) ? '미감지' : (val || '—')}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   코웨이 전용 컴포넌트
+════════════════════════════════════════════════════════ */
+function ColMapForm({ headers, colMap, onChange }) {
+  const REQUIRED = [
+    {key:'code',  label:'제품코드'},
+    {key:'model', label:'모델명'},
+    {key:'name',  label:'상품명'},
+  ];
+  const OPTIONAL = [
+    {key:'mandatory', label:'의무기간'},
+    {key:'group',     label:'제품그룹'},
+    {key:'fee',       label:'렌탈료'},
+    {key:'visit',     label:'방문주기'},
+    {key:'note1',     label:'비고1'},
+    {key:'note2',     label:'비고2'},
+  ];
+  const mkSelect = (f, optional=false) => (
+    <div className="field-row" key={f.key}>
+      <span className="field-name">
+        {f.label}
+        {optional ? <span className="field-opt"> 선택</span> : <span className="field-req"> *</span>}
+      </span>
+      <span className="field-arrow">→</span>
+      <select
+        className={`fsel${colMap[f.key]?' mapped':''}${optional?' optional':''}`}
+        value={colMap[f.key]}
+        onChange={e=>onChange({...colMap,[f.key]:e.target.value})}
+      >
+        <option value="">{optional?'-- 없음 --':'-- 선택 --'}</option>
+        {headers.map(h=><option key={h} value={h}>{h}</option>)}
+      </select>
+    </div>
+  );
+  return (
+    <>
+      <div className="map-section">
+        <div className="sec-label">필수 컬럼 매핑</div>
+        <div className="field-rows">{REQUIRED.map(f=>mkSelect(f,false))}</div>
+      </div>
+      <div className="map-section">
+        <div className="sec-label">선택 컬럼 매핑 <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,fontSize:11}}>(없으면 빈 값으로 출력)</span></div>
+        <div className="field-rows">{OPTIONAL.map(f=>mkSelect(f,true))}</div>
+      </div>
+    </>
+  );
+}
+
+function ReferencePanel() {
+  const COLOR_CHIPS = Object.entries(COLOR_CODE_MAP).slice(0,24);
+  return (
+    <div>
+      <div className="ref-block">
+        <div className="sec-label">자동 처리 규칙</div>
+        {[
+          {kw:'자가/셀프',arr:'→',out:'관리방법 002'},
+          {kw:'방문 (기본)',arr:'→',out:'관리방법 001'},
+          {kw:'타사보상',arr:'→',out:'세부구분 008'},
+          {kw:'그 외 기본',arr:'→',out:'세부구분 023'},
+          {kw:'모델명 _WT 등',arr:'→',out:'색상 자동 추출'},
+          {kw:'상품명 색상 텍스트',arr:'→',out:'색상 자동 추출'},
+          {kw:'동일 기본 모델',arr:'→',out:'색상 합산'},
+          {kw:'N년 (상품명)',arr:'→',out:'N년의무 + N×12개월'},
+        ].map((r,i)=>(
+          <div className="ref-rule-row" key={i}>
+            <span className="ref-rule-kw">{r.kw}</span>
+            <span className="ref-rule-arr">{r.arr}</span>
+            <span className="ref-rule-out">{r.out}</span>
+          </div>
+        ))}
+      </div>
+      <div className="divider" />
+      <div className="ref-block">
+        <div className="sec-label">색상 코드 참고 (_XX)</div>
+        <div className="color-scroll">
+          <div className="color-chip-grid">
+            {COLOR_CHIPS.map(([k,v])=>(
+              <span className="color-chip" key={k} title={v}>{k}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="divider" />
+      <div className="ref-block">
+        <div className="sec-label">제품구분 코드 참고</div>
+        <div className="cat-scroll">
+          {CATEGORY_ALL.map(c=>(
+            <div className="cat-row" key={c.code}>
+              <span className="cat-code">{c.code}</span>
+              <span className="cat-name">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   가전종합 전용 컴포넌트
+════════════════════════════════════════════════════════ */
+function PrefixSelector({ prefix, onPrefixChange, dateStr, onDateChange }) {
+  return (
+    <div>
+      <div className="sec-label" style={{marginBottom:10}}>렌탈사 선택 (제품코드 앞 2자리)</div>
+      <div className="prefix-row">
+        {RENTAL_PREFIXES.map(p => (
+          <button
+            key={p.code}
+            className={`prefix-btn${prefix===p.code?' active':''}`}
+            onClick={()=>onPrefixChange(p.code)}
+          >
+            <span className="prefix-code">{p.code}</span>
+            <span className="prefix-name">{p.name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="custom-prefix-wrap">
+        <input
+          className="custom-prefix-input"
+          type="text"
+          maxLength={2}
+          placeholder="직접"
+          value={prefix}
+          onChange={e => {
+            const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,2);
+            onPrefixChange(v);
+          }}
+        />
+        <span style={{fontSize:12,color:'var(--text-sub)'}}>위 버튼 클릭 또는 직접 입력 (영문·숫자 2자리)</span>
+      </div>
+      <div className="divider" />
+      <div className="sec-label" style={{marginBottom:10}}>날짜 설정 (YYMMDD)</div>
+      <div className="date-row">
+        <span className="date-label">날짜</span>
+        <input
+          className="date-input"
+          type="text"
+          maxLength={6}
+          placeholder="250529"
+          value={dateStr}
+          onChange={e => {
+            const v = e.target.value.replace(/\D/g,'').slice(0,6);
+            onDateChange(v);
+          }}
+        />
+        <div className="code-preview-box">
+          <div className="code-preview">
+            {(prefix||'??') + (dateStr||'YYMMDD') + '001'}
+          </div>
+          <div className="code-preview-note">동일 모델명 = 동일 끝 3자리</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GjColMapForm({ headers, colMap, onChange }) {
+  const REQUIRED = [
+    {key:'model', label:'모델명'},
+    {key:'name',  label:'제품명'},
+  ];
+  const OPTIONAL = [
+    {key:'mgmt',      label:'관리방법'},
+    {key:'group',     label:'제품그룹'},
+    {key:'mandatory', label:'의무기간'},
+    {key:'fee',       label:'렌탈가'},
+  ];
+  const mkSelect = (f, optional=false) => (
+    <div className="field-row" key={f.key}>
+      <span className="field-name">
+        {f.label}
+        {optional ? <span className="field-opt"> 선택</span> : <span className="field-req"> *</span>}
+      </span>
+      <span className="field-arrow">→</span>
+      <select
+        className={`fsel${colMap[f.key]?' mapped':''}${optional?' optional':''}`}
+        value={colMap[f.key]}
+        onChange={e=>onChange({...colMap,[f.key]:e.target.value})}
+      >
+        <option value="">{optional?'-- 없음 --':'-- 선택 --'}</option>
+        {headers.map(h=><option key={h} value={h}>{h}</option>)}
+      </select>
+    </div>
+  );
+  return (
+    <>
+      <div className="map-section">
+        <div className="sec-label">필수 컬럼 매핑</div>
+        <div className="field-rows">{REQUIRED.map(f=>mkSelect(f,false))}</div>
+      </div>
+      <div className="map-section">
+        <div className="sec-label">선택 컬럼 매핑</div>
+        <div className="field-rows">{OPTIONAL.map(f=>mkSelect(f,true))}</div>
+      </div>
+    </>
+  );
+}
+
+function GjReferencePanel() {
+  return (
+    <div>
+      <div className="ref-block">
+        <div className="sec-label">자동 처리 규칙</div>
+        {[
+          {kw:'(36),(48),(60) 뒤쪽',arr:'→',out:'품목명에서 제거'},
+          {kw:'_36,_48,_60 뒤쪽',arr:'→',out:'품목명에서 제거'},
+          {kw:'동일 모델명',arr:'→',out:'동일 품목명 + 동일 코드 끝 3자리'},
+          {kw:'타사보상 포함',arr:'→',out:'세부구분 008'},
+          {kw:'자가/셀프/자가관리',arr:'→',out:'관리방법 002'},
+          {kw:'의무기간 ÷ 3',arr:'→',out:'N년의무 (예: 9→3년)'},
+          {kw:'색상',arr:'→',out:'미처리 (빈 값)'},
+          {kw:'방문주기/프로모션',arr:'→',out:'미처리 (빈 값)'},
+        ].map((r,i)=>(
+          <div className="ref-rule-row" key={i}>
+            <span className="ref-rule-kw">{r.kw}</span>
+            <span className="ref-rule-arr">{r.arr}</span>
+            <span className="ref-rule-out">{r.out}</span>
+          </div>
+        ))}
+      </div>
+      <div className="divider" />
+      <div className="ref-block">
+        <div className="sec-label">구전산 컬럼 순서 (참고)</div>
+        {['제품코드','제품명','모델명','관리방법','제품그룹','브랜드','의무기간','렌탈가','일반판매가','접수여부'].map((c,i)=>(
+          <div className="ref-rule-row" key={i}>
+            <span className="ref-rule-kw">{i+1}. {c}</span>
+          </div>
+        ))}
+      </div>
+      <div className="divider" />
+      <div className="ref-block">
+        <div className="sec-label">제품구분 코드 참고</div>
+        <div className="cat-scroll">
+          {CATEGORY_ALL.map(c=>(
+            <div className="cat-row" key={c.code}>
+              <span className="cat-code">{c.code}</span>
+              <span className="cat-name">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   코웨이 변환기
+════════════════════════════════════════════════════════ */
+function CowayConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [fileName, setFileName] = useState('');
+  const [rawData,  setRawData]  = useState([]);
+  const [headers,  setHeaders]  = useState([]);
+  const [colMap,   setColMap]   = useState({
+    code:'', model:'', name:'',
+    fee:'', visit:'', note1:'', note2:'', mandatory:'', group:'',
+  });
+  const [result, setResult] = useState([]);
+
+  const handleFile = useCallback((name, json) => {
+    const hdrs = Object.keys(json[0]).filter(k => !k.startsWith('_'));
+    setFileName(name);
+    setRawData(json);
+    setHeaders(hdrs);
+    setResult([]);
+    const auto = {code:'',model:'',name:'',fee:'',visit:'',note1:'',note2:'',mandatory:'',group:''};
+    const KW = {
+      code:      ['제품코드','상품코드','품목코드','code'],
+      model:     ['모델명','모델','model'],
+      name:      ['상품명','제품명','품명','name'],
+      fee:       ['렌탈가','렌탈료','월렌탈료','렌탈금액','월렌탈','rental','fee'],
+      visit:     ['방문주기','방문'],
+      note1:     ['비고1','비고','note1','remark1'],
+      note2:     ['비고2','note2','remark2'],
+      mandatory: ['의무기간','의무개월','약정기간','의무월수'],
+      group:     ['제품그룹','상품그룹','카테고리','그룹'],
+    };
+    hdrs.forEach(h => {
+      const lh = h.toLowerCase();
+      Object.keys(KW).forEach(k => {
+        if (!auto[k] && KW[k].some(kw => h.includes(kw) || lh.includes(kw.toLowerCase()))) {
+          auto[k] = h;
+        }
+      });
+    });
+    setColMap(auto);
+    setPhase('configure');
+  }, []);
+
+  const canConvert = colMap.code && colMap.model && colMap.name;
+  const handleConvert = () => {
+    setResult(transform(rawData, colMap));
+    setPhase('preview');
+  };
+  const errCount = result.filter(r => r._hasError).length;
+
+  return (
+    <>
+      <StepBar phase={phase} />
+
+      {(phase==='upload' || phase==='configure') && (
+        <div className="grid-2 fi">
+          <div className="card">
+            <div className="card-head">
+              <div className="card-icon">📁</div>
+              <span className="card-title">구전산 파일 업로드</span>
+            </div>
+            <DropZone onFile={handleFile} fileName={fileName} rowCount={rawData.length} />
+            {phase==='configure' && (
+              <ColMapForm headers={headers} colMap={colMap} onChange={setColMap} />
+            )}
+          </div>
+          <div className="card fi fi-1">
+            <div className="card-head">
+              <div className="card-icon">📖</div>
+              <span className="card-title">변환 규칙 & 코드 참고</span>
+            </div>
+            <ReferencePanel />
+          </div>
+        </div>
+      )}
+
+      {phase==='configure' && (
+        <div className="convert-wrap fi fi-2">
+          <button className="btn-convert" onClick={handleConvert} disabled={!canConvert}>
+            ⚡ 변환 시작
+          </button>
+          {!canConvert && (
+            <div className="convert-hint">제품코드 · 모델명 · 상품명 컬럼을 모두 선택해야 합니다.</div>
+          )}
+        </div>
+      )}
+
+      {phase==='preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료
+              {errCount > 0
+                ? ` · ⚠️ ${errCount}행 약정 미감지 (확인 필요)`
+                : ' · ✅ 모든 행 정상 변환'}
+              <br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('configure');setResult([]);}}>
+                ← 다시 설정
+              </button>
+              <button className="btn-dl" onClick={()=>exportXlsx(result,fileName)}>
+                📥 신전산 엑셀 다운로드
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   가전종합 변환기
+════════════════════════════════════════════════════════ */
+function GaJeonConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('SM');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawData,  setRawData]  = useState([]);
+  const [headers,  setHeaders]  = useState([]);
+  const [colMap,   setColMap]   = useState({
+    model:'', name:'', mgmt:'', group:'', mandatory:'', fee:'',
+  });
+  const [result, setResult] = useState([]);
+
+  const handleFile = useCallback((name, json) => {
+    const hdrs = Object.keys(json[0]).filter(k => !k.startsWith('_'));
+    setFileName(name);
+    setRawData(json);
+    setHeaders(hdrs);
+    setResult([]);
+    const auto = {model:'',name:'',mgmt:'',group:'',mandatory:'',fee:''};
+    const KW = {
+      model:     ['모델명','모델','model'],
+      name:      ['제품명','상품명','품명','name'],
+      mgmt:      ['관리방법','관리'],
+      group:     ['제품그룹','그룹','카테고리'],
+      mandatory: ['의무기간','의무','약정기간'],
+      fee:       ['렌탈가','렌탈료','월렌탈','rental','fee'],
+    };
+    hdrs.forEach(h => {
+      const lh = h.toLowerCase();
+      Object.keys(KW).forEach(k => {
+        if (!auto[k] && KW[k].some(kw => h.includes(kw) || lh.includes(kw.toLowerCase()))) {
+          auto[k] = h;
+        }
+      });
+    });
+    setColMap(auto);
+    setPhase('configure');
+  }, []);
+
+  const canConvert = colMap.model && colMap.name;
+  const handleConvert = () => {
+    setResult(transformGaJeon(rawData, colMap, prefix, dateStr));
+    setPhase('preview');
+  };
+  const errCount = result.filter(r => r._hasError).length;
+
+  return (
+    <>
+      {/* 렌탈사 & 날짜 설정 (항상 표시) */}
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">🏷️</div>
+          <span className="card-title">렌탈사 & 날짜 설정</span>
+        </div>
+        <PrefixSelector
+          prefix={prefix}
+          onPrefixChange={setPrefix}
+          dateStr={dateStr}
+          onDateChange={setDateStr}
+        />
+      </div>
+
+      <StepBar phase={phase} />
+
+      {(phase==='upload' || phase==='configure') && (
+        <div className="grid-2 fi">
+          <div className="card">
+            <div className="card-head">
+              <div className="card-icon">📁</div>
+              <span className="card-title">가전종합 구전산 파일 업로드</span>
+            </div>
+            <DropZone
+              onFile={handleFile}
+              fileName={fileName}
+              rowCount={rawData.length}
+              label="가전종합 구전산 파일을 이곳에 끌어다 놓으세요"
+            />
+            {phase==='configure' && (
+              <GjColMapForm headers={headers} colMap={colMap} onChange={setColMap} />
+            )}
+          </div>
+          <div className="card fi fi-1">
+            <div className="card-head">
+              <div className="card-icon">📖</div>
+              <span className="card-title">변환 규칙 & 코드 참고</span>
+            </div>
+            <GjReferencePanel />
+          </div>
+        </div>
+      )}
+
+      {phase==='configure' && (
+        <div className="convert-wrap fi fi-2">
+          <button className="btn-convert" onClick={handleConvert} disabled={!canConvert}>
+            ⚡ 변환 시작
+          </button>
+          {!canConvert && (
+            <div className="convert-hint">모델명 · 제품명 컬럼을 선택해야 합니다.</div>
+          )}
+        </div>
+      )}
+
+      {phase==='preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} warnLabel="약정 미감지" />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료
+              {errCount > 0
+                ? ` · ⚠️ ${errCount}행 약정 미감지`
+                : ' · ✅ 모든 행 정상 변환'}
+              <br/>
+              <span style={{fontSize:12}}>
+                제품코드: {prefix}{dateStr}001 ~ {prefix}{dateStr}{String(result.length).padStart(3,'0')} ·{' '}
+                출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_신가전종합.xlsx')}
+              </span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('configure');setResult([]);}}>
+                ← 다시 설정
+              </button>
+              <button className="btn-dl" onClick={()=>exportGaJeonXlsx(result,fileName)}>
+                📥 신가전종합 엑셀 다운로드
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 컴포넌트
+════════════════════════════════════════════════════════ */
+function LgCodeConfig({ prefix, onPrefixChange, dateStr, onDateChange }) {
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:18, flexWrap:'wrap'}}>
+      <div style={{display:'flex', alignItems:'center', gap:8}}>
+        <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>제품코드 앞 2자리</span>
+        <input
+          style={{
+            height:36, width:64, padding:'0 8px',
+            border:'1.5px solid var(--orange)', borderRadius:8,
+            fontSize:16, fontFamily:'var(--mono)', fontWeight:700,
+            textTransform:'uppercase', textAlign:'center',
+            outline:'none', color:'var(--orange)', background:'var(--orange-08)',
+          }}
+          type="text" maxLength={2} value={prefix}
+          onChange={e => onPrefixChange(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,2))}
+        />
+      </div>
+      <div style={{display:'flex', alignItems:'center', gap:8}}>
+        <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>날짜(YYMMDD)</span>
+        <input
+          style={{
+            height:36, width:110, padding:'0 10px',
+            border:'1.5px solid var(--gray-2)', borderRadius:8,
+            fontSize:13, fontFamily:'var(--mono)',
+            background:'var(--white)', color:'var(--text)', outline:'none',
+          }}
+          type="text" maxLength={6} placeholder="260529" value={dateStr}
+          onChange={e => onDateChange(e.target.value.replace(/\D/g,'').slice(0,6))}
+        />
+      </div>
+      <div className="code-preview-box">
+        <div className="code-preview">{prefix||'??'}{dateStr||'YYMMDD'}001</div>
+        <div className="code-preview-note">동일 모델명 = 동일 끝 3자리</div>
+      </div>
+    </div>
+  );
+}
+
+function LgJeongsugiConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => {
+    const res = transformLgJeongsugi(rows, p, d);
+    setResult(res);
+    return res;
+  };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      {/* 코드 설정 */}
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">🏷️</div>
+          <span className="card-title">제품코드 설정</span>
+        </div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      {/* 업로드 + 가이드 */}
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head">
+            <div className="card-icon">📁</div>
+            <span className="card-title">LG 정수기 수수료표 업로드</span>
+          </div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <>
+                <div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div>
+              </>
+            ) : (
+              <>
+                <div className="drop-icon">📊</div>
+                <div className="drop-title">LG 정수기 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">또는 클릭하여 파일 선택</div>
+                <div className="drop-formats">
+                  <span className="fmt-tag">.xlsx</span>
+                  <span className="fmt-tag">.xls</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델코드</b> WD722R(K/H/E) → WD722RK / WD722RH / WD722RE 분리<br/>
+            · <b>색상</b> 블랙/화이트/베이지 → 모델과 1:1 매칭<br/>
+            · <b>세부구분</b> 단품→001 · 신규결합→027 · 기존결합→028<br/>
+            · <b>방문주기</b> 6→6개월 · 4→4개월 · 3→3개월 · 자가→관리없음<br/>
+            · <b>특수구간</b> WD523ACB/WD520ACB 1년차 열 자동 제외
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head">
+            <div className="card-icon">📖</div>
+            <span className="card-title">변환 규칙 참고</span>
+          </div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[
+                {kw:'단품',arr:'→',out:'001 일반'},
+                {kw:'신규결합',arr:'→',out:'027 신규결합'},
+                {kw:'기존결합',arr:'→',out:'028 기존결합'},
+              ].map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">약정방법 / 의무</div>
+              {[
+                {kw:'계약/의무 6년/6년',arr:'→',out:'6년의무 / 72개월'},
+                {kw:'계약/의무 5년/5년',arr:'→',out:'5년의무 / 60개월'},
+                {kw:'계약/의무 4년/4년',arr:'→',out:'4년의무 / 48개월'},
+              ].map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">품목명 / 제품구분</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">라인업 + 제품군</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">예: 듀얼 정수기</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">정수기</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">제품구분 001</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 미리보기 + 다운로드 */}
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 정수기<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>
+                ← 초기화
+              </button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG정수기')}>
+                📥 신전산 엑셀 다운로드
+              </button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG정수기')}>
+                📥 신전산 엑셀 다운로드 2
+              </button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>
+                📥 구전산 변환 다운로드
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function LgNaengjanggoConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => {
+    const res = transformLgNaengjanggo(rows, p, d);
+    setResult(res);
+    return res;
+  };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">🏷️</div>
+          <span className="card-title">제품코드 설정</span>
+        </div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head">
+            <div className="card-icon">📁</div>
+            <span className="card-title">LG 냉장고(김냉포함) 수수료표 업로드</span>
+          </div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <>
+                <div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div>
+              </>
+            ) : (
+              <>
+                <div className="drop-icon">📊</div>
+                <div className="drop-title">LG 냉장고 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">또는 클릭하여 파일 선택</div>
+                <div className="drop-formats">
+                  <span className="fmt-tag">.xlsx</span>
+                  <span className="fmt-tag">.xls</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델명</b> 구분1(단품모델명) 컬럼 그대로 사용<br/>
+            · <b>품목명</b> 모델명 + 제품군 + [서비스타입] + 냉장고 (김치냉장고 제외)<br/>
+            · <b>제품구분</b> 냉장고→031 · 김치냉장고→032<br/>
+            · <b>세부구분</b> 구독료→001 · 신규결합→027 · 기존결합→028 · 선납→029<br/>
+            · <b>선납금</b> 30%/50% → 비고1에 "X% 선납금 : 금액원" 기재<br/>
+            · <b>무시</b> 정산수수료(col20~27) · 케어금액 · 전월대비변경사항<br/>
+            · <b>색상</b> 빈 값 (표기 보류)
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head">
+            <div className="card-icon">📖</div>
+            <span className="card-title">변환 규칙 참고</span>
+          </div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[
+                {kw:'구독료(단품)',arr:'→',out:'001 일반'},
+                {kw:'신규결합',arr:'→',out:'027 신규결합'},
+                {kw:'기존결합',arr:'→',out:'028 기존결합'},
+                {kw:'30%/50% 선납',arr:'→',out:'029 선납금'},
+              ].map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">약정방법 / 의무</div>
+              {[
+                {kw:'36개월',arr:'→',out:'3년의무 / 36개월'},
+                {kw:'48개월',arr:'→',out:'4년의무 / 48개월'},
+                {kw:'60개월',arr:'→',out:'5년의무 / 60개월'},
+                {kw:'72개월',arr:'→',out:'6년의무 / 72개월'},
+              ].map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">비고1 (선납금)</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">30% 선납금</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">비고1: 30% 선납금 : X원</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">50% 선납금</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">비고1: 50% 선납금 : X원</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">제품구분</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">냉장고 계열</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">031</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">김치냉장고 계열</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">032</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 냉장고(김냉포함)<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>
+                ← 초기화
+              </button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG냉장고')}>
+                📥 신전산 엑셀 다운로드
+              </button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG냉장고')}>
+                📥 신전산 엑셀 다운로드 2
+              </button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>
+                📥 구전산 변환 다운로드
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 쿠킹(식기세척기/전기레인지/광파오븐) 파싱
+════════════════════════════════════════════════════════ */
+// 쿠킹 컬럼 구조 (파일 버전별 자동 감지)
+// 5월: feeStart=19(T~[), seonapStart=35
+// 6월: feeStart=10(K~R), seonapStart=18(S~V)
+// 공통: col[2]=제품군, col[3]=구분1/모델명, col[4]=구분2/설치타입, col[6]=방문주기, col[7]=케어타입
+
+function getLgCookingProdCat(제품군) {
+  if (제품군.includes('식기세척기')) return '008';
+  return '006';
+}
+
+function transformLgCooking(rawRows, prefix, dateStr) {
+  // 파일 버전 자동 감지
+  // 5월: "프로모션 적용 최종 월요금" 헤더가 있고 선납금이 col[35]
+  // 6월: 선납금이 col[18](S), 렌탈료가 col[10](K)부터 시작
+  let feeStart    = 19;  // 5월 기본값
+  let seonapStart = 35;  // 5월 기본값
+
+  outer1: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 10; ci < row.length; ci++) {
+      if (String(row[ci] || '').includes('프로모션 적용 최종 월요금')) {
+        feeStart = ci + 1;
+        break outer1;
+      }
+    }
+  }
+  outer2: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 10; ci < row.length; ci++) {
+      const v = String(row[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) {
+        seonapStart = ci;
+        break outer2;
+      }
+    }
+  }
+  // 6월 포맷: 선납금이 렌탈료보다 앞에 있으므로 렌탈료 시작을 K(10)으로 보정
+  if (seonapStart < feeStart) feeStart = 10;
+
+  const FEES = [
+    {months:36, year:3, col:feeStart,   sub:'001'},
+    {months:48, year:4, col:feeStart+1, sub:'001'},
+    {months:48, year:4, col:feeStart+2, sub:'027'},
+    {months:60, year:5, col:feeStart+3, sub:'001'},
+    {months:60, year:5, col:feeStart+4, sub:'027'},
+    {months:72, year:6, col:feeStart+5, sub:'001'},
+    {months:72, year:6, col:feeStart+6, sub:'027'},
+    {months:72, year:6, col:feeStart+7, sub:'028'},
+  ];
+  const SEONAPGUM = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군   = String(row[2] || '').trim();
+    const 구분1   = String(row[3] || '').trim();
+    const 구분2   = String(row[4] || '').trim();
+    const 케어타입 = String(row[7] || '').trim();
+
+    if (!구분1 || !제품군) continue;
+
+    const 방문raw = String(row[6] || '').trim();
+    const 방문Num = parseInt(방문raw.replace('개월','').trim(), 10);
+    if (isNaN(방문Num) || 방문Num <= 0) continue;
+
+    const visitVal = `${방문Num}개월`;
+    const prodCat  = getLgCookingProdCat(제품군);
+
+    const 설치부분 = 구분2 ? ` [${구분2}]` : '';
+    const 케어부분 = 케어타입 ? ` (${케어타입})` : '';
+    const itemName = `${구분1} ${제품군}${설치부분}${케어부분}`;
+
+    // 렌탈료 (자동 감지된 feeStart 기준 K~R 또는 T~[)
+    const firstFee = row[feeStart];
+    if (firstFee === '' || firstFee === null || firstFee === undefined || Number(firstFee) <= 0) continue;
+
+    for (const f of FEES) {
+      const fee = row[f.col];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      items.push({ model:구분1, itemName, months:f.months, year:f.year,
+                   sub:f.sub, mgmtCode:'001', visitVal, fee:feeNum, prodCat, bigo1:'' });
+    }
+
+    // 선납금 30%/50% (구독료만, sub='029', 72개월 고정)
+    for (const s of SEONAPGUM) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:구분1, itemName, months:72, year:6, sub:'029',
+                   mgmtCode:'001', visitVal, fee:feeNum, prodCat, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': r.prodCat,
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function LgCookingConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => { const res = transformLgCooking(rows, p, d); setResult(res); return res; };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다.\n\n파일 형식을 확인해주세요.\n예상 컬럼: col[1]=제품군, col[2]=구분1(모델명), col[3]=구분2(설치타입), col[4]=방문주기, col[5]=케어서비스타입, col[12~19]=렌탈료');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head"><div className="card-icon">📁</div><span className="card-title">LG 쿠킹 수수료표 업로드</span></div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <><div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div></>
+            ) : (
+              <><div className="drop-icon">📊</div>
+                <div className="drop-title">LG 쿠킹 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">식기세척기 · 전기레인지 · 광파오븐</div>
+                <div className="drop-formats"><span className="fmt-tag">.xlsx</span><span className="fmt-tag">.xls</span></div></>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델명</b> 구분1/단품모델명 컬럼<br/>
+            · <b>품목명</b> 모델명 + 제품군 + [설치타입] + (케어서비스타입)<br/>
+            · <b>예시</b> DEE6BGE.AKOR 식기세척기 [빌트인] (기본)<br/>
+            · <b>제품구분</b> 식기세척기→008 · 레인지/오븐→006<br/>
+            · <b>세부구분</b> 구독료→001 · 신규결합→027 · 기존결합→028 · 선납→029<br/>
+            · <b>무시</b> 멤버십산정기준가 · 구독료할인 · 정산수수료 · 케어금액 · 전월대비
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head"><div className="card-icon">📖</div><span className="card-title">변환 규칙 참고</span></div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">품목명 구성</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">구분1</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">모델명</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ 제품군</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">식기세척기 등</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ [구분2]</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">[빌트인]</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ (케어타입)</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">(기본)</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[{kw:'구독료',arr:'→',out:'001 일반'},{kw:'신규결합',arr:'→',out:'027'},{kw:'기존결합',arr:'→',out:'028'},{kw:'30%/50% 선납',arr:'→',out:'029 선납금'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">약정방법 / 의무</div>
+              {[{kw:'36개월',arr:'→',out:'3년의무'},{kw:'48개월',arr:'→',out:'4년의무'},{kw:'60개월',arr:'→',out:'5년의무'},{kw:'72개월',arr:'→',out:'6년의무'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">비고1 (선납금)</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">30% 선납</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">30% 선납금 : X원</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">50% 선납</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">50% 선납금 : X원</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 쿠킹(식기세척기/레인지/오븐)<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG쿠킹')}>📥 신전산 엑셀 다운로드</button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG쿠킹')}>📥 신전산 엑셀 다운로드 2</button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 TV 파싱
+════════════════════════════════════════════════════════ */
+// TV 컬럼 구조 (파일 버전별 자동 감지)
+// 공통: col[3]=제품군, col[5]=구분2/설치타입, col[6]=G 제품모델명(CSMS등록)=모델명
+//       col[7]=방문주기, col[8]=서비스타입
+//       col[11~18]=L~S 구독료 (5월·6월 동일)
+// 5월: seonapStart=28 (선납금 col[28~31])
+// 6월: seonapStart=20 (선납금 col[20~23] = U~X)
+const LG_TV_FEES = [
+  {months:36, year:3, col:11, sub:'001'},
+  {months:48, year:4, col:12, sub:'001'},
+  {months:48, year:4, col:13, sub:'027'},
+  {months:60, year:5, col:14, sub:'001'},
+  {months:60, year:5, col:15, sub:'027'},
+  {months:72, year:6, col:16, sub:'001'},
+  {months:72, year:6, col:17, sub:'027'},
+  {months:72, year:6, col:18, sub:'028'},
+];
+
+function transformLgTV(rawRows, prefix, dateStr) {
+  // 선납금 컬럼 자동 감지: "30% 선납" 텍스트 위치
+  // 5월: col[28] / 6월: col[20]
+  let seonapStart = 28;
+  outer: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 11; ci < row.length; ci++) {
+      const v = String(row[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) { seonapStart = ci; break outer; }
+    }
+  }
+  const SEONAPGUM = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군   = String(row[3] || '').trim();
+    const 모델명   = String(row[6] || '').trim(); // G열: 제품모델명(CSMS등록)
+    const 설치타입 = String(row[5] || '').trim();
+    const 방문raw  = String(row[7] || '').trim();
+    const svcType  = String(row[8] || '').trim();
+
+    if (!모델명 || !제품군) continue;
+    const firstFee = row[11];
+    if (firstFee === '' || firstFee === null || firstFee === undefined || isNaN(Number(firstFee)) || Number(firstFee) <= 0) continue;
+
+    const isJaga   = !방문raw || 방문raw === '-';
+    const 방문Num  = parseInt(방문raw.replace('개월','').trim(), 10);
+    const visitVal = isJaga ? '관리없음' : `${방문Num}개월`;
+    const mgmtCode = isJaga ? '002' : '001';
+
+    const 설치부분  = (설치타입 && 설치타입 !== '-') ? ` [${설치타입}]` : '';
+    const 서비스부분 = (svcType && svcType !== '-') ? ` (${svcType})` : '';
+    const itemName  = `${모델명} ${제품군}${설치부분}${서비스부분}`;
+
+    // 구독료 (L~S, col[11~18] — 5월·6월 동일)
+    for (const f of LG_TV_FEES) {
+      const fee = row[f.col];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      items.push({ model:모델명, itemName, months:f.months, year:f.year,
+                   sub:f.sub, mgmtCode, visitVal, fee:feeNum, bigo1:'' });
+    }
+
+    // 선납금 30%/50% (자동 감지 seonapStart, sub='029', 72개월 고정)
+    for (const s of SEONAPGUM) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:모델명, itemName, months:72, year:6, sub:'029',
+                   mgmtCode, visitVal, fee:feeNum, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': '030',
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function LgTVConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => { const res = transformLgTV(rows, p, d); setResult(res); return res; };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head"><div className="card-icon">📁</div><span className="card-title">LG TV 수수료표 업로드</span></div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <><div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div></>
+            ) : (
+              <><div className="drop-icon">📺</div>
+                <div className="drop-title">LG TV 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">OLED · QNED · NANO · 스바미2 등</div>
+                <div className="drop-formats"><span className="fmt-tag">.xlsx</span><span className="fmt-tag">.xls</span></div></>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델명</b> 구분1/단품모델명 컬럼<br/>
+            · <b>품목명</b> 모델명 + 제품군 + [설치타입] + (서비스타입)<br/>
+            · <b>예시</b> OLED83C6FSP.AKRG OLED+스바미2 [스탠드] (라이트 플러스)<br/>
+            · <b>방문주기</b> "-" 또는 빈값 → 관리없음(002) · "36개월" → 36개월(001)<br/>
+            · <b>세부구분</b> 구독료→001 · 신규결합→027 · 기존결합→028 · 선납→029<br/>
+            · <b>무시</b> 멤버십 · 케어금액 · 72개월총구독료 · 정산수수료 · 비고 · 채널
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head"><div className="card-icon">📖</div><span className="card-title">변환 규칙 참고</span></div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">품목명 구성</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">구분1 + 제품군</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">기본 구성</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ [구분2/설치타입]</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">[스탠드] / [벽걸이]</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ (서비스타입)</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">(라이트 플러스)</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">"-" 서비스타입</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">생략</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">방문주기 / 관리방법</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">"-" 또는 빈값</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">관리없음 / 002</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">36개월</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">36개월 / 001</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">세부구분 · 약정방법</div>
+              {[{kw:'구독료',arr:'→',out:'001 · 36/48/60/72개월'},{kw:'신규결합',arr:'→',out:'027 · 48/60/72개월'},{kw:'기존결합',arr:'→',out:'028 · 72개월'},{kw:'30%/50% 선납',arr:'→',out:'029 · 6년의무'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG TV<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LGTV')}>📥 신전산 엑셀 다운로드</button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LGTV')}>📥 신전산 엑셀 다운로드 2</button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 공기청정기(제습기 포함) 파싱
+════════════════════════════════════════════════════════ */
+// 공기청정기 컬럼 구조 (파일 버전별 자동 감지)
+// 공통: col[3]=제품군, col[4]=모델명, col[5]=라인업/설치타입
+//       col[6]=방문주기(3/6/12/"자가관리"), col[7]=서비스타입
+//       col[10~17]=K~R 구독료 (5월·6월 동일)
+// 5월: seonapStart=27 (선납금 col[27~30])
+// 6월: seonapStart=19 (선납금 col[19~22] = T~W)
+// 50% 선납 "미운영"인 경우 Number("미운영")=NaN → 자동 제외
+const LG_AIR_FEES = [
+  {months:36, year:3, col:10, sub:'001'},
+  {months:48, year:4, col:11, sub:'001'},
+  {months:48, year:4, col:12, sub:'027'},
+  {months:60, year:5, col:13, sub:'001'},
+  {months:60, year:5, col:14, sub:'027'},
+  {months:72, year:6, col:15, sub:'001'},
+  {months:72, year:6, col:16, sub:'027'},
+  {months:72, year:6, col:17, sub:'028'},
+];
+
+function getLgAirProdCat(제품군) {
+  if (제품군.includes('제습기')) return '018';
+  return '002';
+}
+
+function transformLgAir(rawRows, prefix, dateStr) {
+  // 선납금 컬럼 자동 감지: "30% 선납" 텍스트 위치
+  // 5월: col[27] / 6월: col[19](T)
+  let seonapStart = 27;
+  outer: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 10; ci < row.length; ci++) {
+      const v = String(row[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) { seonapStart = ci; break outer; }
+    }
+  }
+  const SEONAPGUM = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군  = String(row[3] || '').trim();
+    const 모델명  = String(row[4] || '').trim();
+    const 라인업  = String(row[5] || '').trim();
+    const 방문raw = String(row[6] || '').trim();
+    const svcType = String(row[7] || '').trim();
+
+    if (!모델명 || !제품군) continue;
+    const firstFee = row[10];
+    if (firstFee === '' || firstFee === null || firstFee === undefined || isNaN(Number(firstFee)) || Number(firstFee) <= 0) continue;
+
+    const isJaga   = 방문raw === '자가관리' || 방문raw === '' || 방문raw === '-';
+    const 방문Num  = parseInt(방문raw, 10);
+    const visitVal = isJaga ? '관리없음' : `${방문Num}개월`;
+    const mgmtCode = isJaga ? '002' : '001';
+
+    const svcPart  = (svcType && svcType !== '-') ? ` (${svcType})` : '';
+    const itemName = `${모델명} ${라인업} ${제품군}${svcPart}`;
+    const prodCat  = getLgAirProdCat(제품군);
+
+    // 구독료 K~R (col[10~17] — 5월·6월 동일)
+    for (const f of LG_AIR_FEES) {
+      const fee = row[f.col];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      items.push({ model:모델명, itemName, months:f.months, year:f.year,
+                   sub:f.sub, mgmtCode, visitVal, fee:feeNum, prodCat, bigo1:'' });
+    }
+
+    // 선납금 30%/50% (자동 감지 seonapStart, sub='029', 72개월 고정)
+    // "미운영" 값은 Number() → NaN → 자동 제외
+    for (const s of SEONAPGUM) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:모델명, itemName, months:72, year:6, sub:'029',
+                   mgmtCode, visitVal, fee:feeNum, prodCat, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': r.prodCat,
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function LgAirConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => { const res = transformLgAir(rows, p, d); setResult(res); return res; };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head"><div className="card-icon">📁</div><span className="card-title">LG 공기청정기 수수료표 업로드</span></div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <><div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div></>
+            ) : (
+              <><div className="drop-icon">💨</div>
+                <div className="drop-title">LG 공기청정기 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">공기청정기 · 하이드로에센셜 · 하이드로타워 · 제습기</div>
+                <div className="drop-formats"><span className="fmt-tag">.xlsx</span><span className="fmt-tag">.xls</span></div></>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델명</b> 구분2/설치타입 컬럼 (이 카테고리만 역할 다름)<br/>
+            · <b>품목명</b> 모델명 + 단품모델명 + 제품군 + (서비스타입)<br/>
+            · <b>예시</b> AS356NSMAM.AKOR 26년360알파AI+ (M7필터) 공기청정기 (라이트플러스)<br/>
+            · <b>제품구분</b> 공기청정기/하이드로류→002 · 제습기→018<br/>
+            · <b>방문주기</b> 3→3개월 · 6→6개월 · 12→12개월 · 자가관리→관리없음<br/>
+            · <b>50% 선납</b> 미운영 → 자동 무시<br/>
+            · <b>무시</b> 멤버십 · 케어금액 · 6년총구독료 · 정산수수료 · 비고 · 채널
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head"><div className="card-icon">📖</div><span className="card-title">변환 규칙 참고</span></div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">품목명 구성</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">구분2(모델명)</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">AS356NSMAM.AKOR</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ 단품모델명</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">26년360알파AI+ (M7필터)</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ 제품군</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">공기청정기</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">+ (서비스타입)</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">(라이트플러스)</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[{kw:'구독료',arr:'→',out:'001 일반'},{kw:'신규결합',arr:'→',out:'027'},{kw:'기존결합',arr:'→',out:'028'},{kw:'30% 선납',arr:'→',out:'029 (비고1 기재)'},{kw:'50% 선납',arr:'→',out:'미운영 → 무시'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">제품구분</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">공기청정기 계열</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">002</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">제습기</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">018</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 공기청정기<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG공기청정기')}>📥 신전산 엑셀 다운로드</button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG공기청정기')}>📥 신전산 엑셀 다운로드 2</button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 에어컨 파싱
+════════════════════════════════════════════════════════ */
+// col[0]=비고(무시), col[1]=전월대비(무시), col[2]=채널(무시)
+// col[3]=제품군(에어컨), col[4]=구분1, col[5]=구분2/설치타입
+// col[6]=제품모델명(CSMS등록)=모델명, col[7]=방문주기, col[8]=서비스타입
+// col[9]=멤버십(무시), col[10]=케어요금(무시), col[11~18]=원가(무시)
+// col[19]=6년총구독료(무시), col[20]=① 추가할인(무시)
+// col[21]=36구독(001), col[22]=48구독(001), col[23]=48신규결합(027)
+// col[24]=60구독(001), col[25]=60신규결합(027)
+// col[26]=72구독(001), col[27]=72신규결합(027), col[28]=72기존결합(028)
+// col[29~36]=정산수수료(무시)
+// col[37]=30%선납금액, col[38]=30%구독료, col[39]=50%선납금액, col[40]=50%구독료
+const LG_AIRCON_FEES = [
+  {months:36, year:3, col:21, sub:'001'},
+  {months:48, year:4, col:22, sub:'001'},
+  {months:48, year:4, col:23, sub:'027'},
+  {months:60, year:5, col:24, sub:'001'},
+  {months:60, year:5, col:25, sub:'027'},
+  {months:72, year:6, col:26, sub:'001'},
+  {months:72, year:6, col:27, sub:'027'},
+  {months:72, year:6, col:28, sub:'028'},
+];
+const LG_AIRCON_SEONAPGUM = [
+  {feeCol:38, amtCol:37, label:'30'},
+  {feeCol:40, amtCol:39, label:'50'},
+];
+
+function transformLgAircon(rawRows, prefix, dateStr) {
+  // 파일 버전 자동 감지: "프로모션 적용 최종 월요금" 헤더 위치로 컬럼 오프셋 결정
+  // 5월 포맷: feeStart=21, seonapStart=37
+  // 6월 포맷: 선납금이 col[20-23]으로 이동 → feeStart=25, seonapStart=20
+  let feeStart    = 21;
+  let seonapStart = 37;
+
+  outer1: for (let ri = 0; ri < Math.min(4, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 10; ci < row.length; ci++) {
+      if (String(row[ci] || '').includes('프로모션 적용 최종 월요금')) {
+        feeStart = ci;
+        break outer1;
+      }
+    }
+  }
+  outer2: for (let ri = 0; ri < Math.min(4, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 10; ci < row.length; ci++) {
+      const v = String(row[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) {
+        seonapStart = ci;
+        break outer2;
+      }
+    }
+  }
+
+  const FEES = [
+    {months:36, year:3, col:feeStart,   sub:'001'},
+    {months:48, year:4, col:feeStart+1, sub:'001'},
+    {months:48, year:4, col:feeStart+2, sub:'027'},
+    {months:60, year:5, col:feeStart+3, sub:'001'},
+    {months:60, year:5, col:feeStart+4, sub:'027'},
+    {months:72, year:6, col:feeStart+5, sub:'001'},
+    {months:72, year:6, col:feeStart+6, sub:'027'},
+    {months:72, year:6, col:feeStart+7, sub:'028'},
+  ];
+  const SEONAPGUM = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군   = String(row[3] || '').trim();
+    const 구분1   = String(row[4] || '').trim();
+    const 구분2   = String(row[5] || '').trim();
+    const 모델명   = String(row[6] || '').trim();
+    const 방문raw  = String(row[7] || '').trim();
+    const svcType  = String(row[8] || '').trim();
+
+    if (!모델명 || !제품군) continue;
+    // 프로모션 최종 36개월 구독료(feeStart 컬럼)가 유효한 행만 처리
+    const firstFee = row[feeStart];
+    if (firstFee === '' || firstFee === null || firstFee === undefined || isNaN(Number(firstFee)) || Number(firstFee) <= 0) continue;
+
+    // 방문주기
+    const 방문Num = parseInt(String(방문raw).replace('개월','').trim(), 10);
+    const isJaga  = isNaN(방문Num) || 방문Num <= 0;
+    const visitVal = isJaga ? '관리없음' : `${방문Num}개월`;
+    const mgmtCode = isJaga ? '002' : '001';
+
+    // 품목명
+    const midParts = [];
+    if (구분1 && 구분1 !== '-') midParts.push(구분1);
+    if (구분2 && 구분2 !== '-' && 구분2 !== 구분1) midParts.push(구분2);
+    if (제품군 && !midParts.includes(제품군)) midParts.push(제품군);
+    const svcPart  = (svcType && svcType !== '-') ? ` (${svcType})` : '';
+    const itemName = `${모델명} ${midParts.join(' ')}${svcPart}`;
+
+    // 렌탈료 (프로모션 적용 최종 월요금, 자동 감지된 feeStart 기준)
+    for (const f of FEES) {
+      const fee = row[f.col];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      items.push({ model:모델명, itemName, months:f.months, year:f.year,
+                   sub:f.sub, mgmtCode, visitVal, fee:feeNum, bigo1:'' });
+    }
+
+    // 선납금 30%/50% (자동 감지된 seonapStart 기준)
+    for (const s of SEONAPGUM) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:모델명, itemName, months:72, year:6, sub:'029',
+                   mgmtCode, visitVal, fee:feeNum, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': '034',
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function LgAirconConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => { const res = transformLgAircon(rows, p, d); setResult(res); return res; };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head"><div className="card-icon">📁</div><span className="card-title">LG 에어컨 수수료표 업로드</span></div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <><div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div></>
+            ) : (
+              <><div className="drop-icon">❄️</div>
+                <div className="drop-title">LG 에어컨 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">벽걸이 · 스탠드 · 시스템 · 2in1 등</div>
+                <div className="drop-formats"><span className="fmt-tag">.xlsx</span><span className="fmt-tag">.xls</span></div></>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>모델명</b> 제품모델명(CSMS등록) 컬럼<br/>
+            · <b>품목명</b> 모델명 + [구분1+구분2+제품군(중복제거)] + (서비스타입)<br/>
+            · <b>예시</b> SQ06GJ1WES.AKOR 벽걸이 에어컨 (프리미엄)<br/>
+            · <b>중복제거</b> 벽걸이+벽걸이 → 벽걸이 (자동)<br/>
+            · <b>렌탈료</b> 프로모션 적용 최종 월요금 컬럼(col 21~28) 사용<br/>
+            · <b>무시</b> 원가·① 추가할인·6년총구독료·정산수수료·멤버십·케어금액·비고·채널
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head"><div className="card-icon">📖</div><span className="card-title">변환 규칙 참고</span></div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">품목명 구성 (중복 자동 제거)</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">벽걸이 + 벽걸이 + 에어컨</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">벽걸이 에어컨</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">쿨2시리즈 + 2in1 + 에어컨</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">쿨2시리즈 2in1 에어컨</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[{kw:'구독료(단품)',arr:'→',out:'001 일반'},{kw:'신규결합(3%)',arr:'→',out:'027'},{kw:'기존결합(3%)',arr:'→',out:'028'},{kw:'30%/50% 선납',arr:'→',out:'029 (비고1 기재)'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">약정방법 / 의무</div>
+              {[{kw:'36개월',arr:'→',out:'3년의무'},{kw:'48개월',arr:'→',out:'4년의무'},{kw:'60개월',arr:'→',out:'5년의무'},{kw:'72개월',arr:'→',out:'6년의무'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 에어컨<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG에어컨')}>📥 신전산 엑셀 다운로드</button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG에어컨')}>📥 신전산 엑셀 다운로드 2</button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 리빙(세탁기·스타일러·안마의자·청소기·슈케어) 파싱
+════════════════════════════════════════════════════════ */
+// 리빙 컬럼 구조 (파일 버전별 자동 감지)
+// 공통: col[3]=제품군, col[4]=구분1, col[5]=구분2, col[6]=모델명
+//       col[8]=케어십형태, col[9]=방문주기
+//       col[11~18]=L~S 원요금(oCol, 폴백용)
+// 5월: feeStart=22(W~AD), seonapStart=38(AM~AP)
+// 6월: feeStart=26(AA~AH), seonapStart=19(T~W)
+// 미운영 값은 pCol에서 감지 시 해당 구간 완전 제외
+
+function getLgLivingProdCat(제품군) {
+  const g = 제품군;
+  if (g.includes('건조기'))  return '009';
+  if (g.includes('스타일러')) return '012';
+  if (g.includes('안마의자')) return '004';
+  if (g.includes('슈케어'))  return '047'; // 생활가전
+  if (g.includes('청소기') || g.includes('로봇')) return '035';
+  return '033'; // 워시콤보·워시타워·드럼·통돌이·미니워시 → 세탁기/워시타워
+}
+
+function transformLgLiving(rawRows, prefix, dateStr) {
+  // 파일 버전 자동 감지
+  // feeStart: "프로모션 적용 최종 월요금" 헤더 컬럼
+  // seonapStart: "30% 선납" 텍스트 컬럼
+  let feeStart    = 22;  // 5월 기본값
+  let seonapStart = 38;  // 5월 기본값
+
+  outer1: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 11; ci < row.length; ci++) {
+      if (String(row[ci] || '').includes('프로모션 적용 최종 월요금')) {
+        feeStart = ci;
+        break outer1;
+      }
+    }
+  }
+  outer2: for (let ri = 0; ri < Math.min(5, rawRows.length); ri++) {
+    const row = rawRows[ri];
+    for (let ci = 11; ci < row.length; ci++) {
+      const v = String(row[ci] || '');
+      if (v.includes('30%') && v.includes('선납')) {
+        seonapStart = ci;
+        break outer2;
+      }
+    }
+  }
+
+  const FEES = [
+    {months:36, year:3, pCol:feeStart,   oCol:11, sub:'001'},
+    {months:48, year:4, pCol:feeStart+1, oCol:12, sub:'001'},
+    {months:48, year:4, pCol:feeStart+2, oCol:13, sub:'027'},
+    {months:60, year:5, pCol:feeStart+3, oCol:14, sub:'001'},
+    {months:60, year:5, pCol:feeStart+4, oCol:15, sub:'027'},
+    {months:72, year:6, pCol:feeStart+5, oCol:16, sub:'001'},
+    {months:72, year:6, pCol:feeStart+6, oCol:17, sub:'027'},
+    {months:72, year:6, pCol:feeStart+7, oCol:18, sub:'028'},
+  ];
+  const SNP = [
+    {feeCol:seonapStart+1, amtCol:seonapStart,   label:'30'},
+    {feeCol:seonapStart+3, amtCol:seonapStart+2, label:'50'},
+  ];
+
+  const items = [];
+
+  for (const row of rawRows) {
+    const 제품군  = String(row[3] || '').trim();
+    const 구분1  = String(row[4] || '').trim();
+    const 구분2  = String(row[5] || '').trim();
+    const 모델명  = String(row[6] || '').trim();
+    const 케어타입 = String(row[8] || '').trim();
+    const 방문raw = String(row[9] || '').trim();
+
+    if (!모델명 || !제품군) continue;
+    if (제품군 === '제품군' || 모델명 === '모델명') continue;
+
+    const isJaga  = 케어타입.includes('자가');
+    const 방문Num = parseInt(방문raw.replace('개월','').trim(), 10);
+    const visitVal = isJaga ? '관리없음' : (!isNaN(방문Num) && 방문Num > 0 ? `${방문Num}개월` : '관리없음');
+    const mgmtCode = (isJaga || 방문Num <= 0) ? '002' : '001';
+
+    const isValid = v => v && v.trim() && v.trim() !== '없음' && v.trim() !== '-';
+    const midParts = [];
+    if (isValid(구분2)) midParts.push(구분2.trim());
+    if (isValid(구분1)) midParts.push(구분1.trim());
+    midParts.push(제품군);
+    const svcPart  = (케어타입 && 케어타입 !== '-') ? ` (${케어타입})` : '';
+    const itemName = `${모델명} ${midParts.join(' ')}${svcPart}`;
+    const prodCat  = getLgLivingProdCat(제품군);
+
+    // 렌탈료: 프로모션(pCol) 우선, 미운영이면 전체 제외, 0이면 원요금(oCol) 폴백
+    for (const f of FEES) {
+      const pVal = row[f.pCol];
+      if (String(pVal || '').includes('미운영')) continue;
+      const pFee = Number(pVal);
+      const oFee = Number(row[f.oCol]);
+      const feeNum = (pFee > 0) ? pFee : (oFee > 0 ? oFee : 0);
+      if (feeNum <= 0) continue;
+      items.push({ model:모델명, itemName, months:f.months, year:f.year,
+                   sub:f.sub, mgmtCode, visitVal, fee:feeNum, prodCat, bigo1:'' });
+    }
+
+    // 선납금 30%/50% (자동 감지 seonapStart, sub='029', 72개월 고정)
+    for (const s of SNP) {
+      const fee = row[s.feeCol];
+      const amt = row[s.amtCol];
+      if (fee === '' || fee === null || fee === undefined) continue;
+      const feeNum = Number(fee);
+      if (isNaN(feeNum) || feeNum <= 0) continue;
+      const amtNum = Number(amt);
+      const bigo1 = (amtNum > 0)
+        ? `${s.label}% 선납금 : ${amtNum.toLocaleString('ko-KR')}원`
+        : '';
+      items.push({ model:모델명, itemName, months:72, year:6, sub:'029',
+                   mgmtCode, visitVal, fee:feeNum, prodCat, bigo1 });
+    }
+  }
+
+  const modelSeq = new Map();
+  let seq = 0;
+  items.forEach(r => { if (!modelSeq.has(r.model)) { seq++; modelSeq.set(r.model, seq); } });
+
+  const result = items.map(r => ({
+    '제품코드': `${prefix}${dateStr}${String(modelSeq.get(r.model)||1).padStart(4,'0')}`,
+    '품목':     buildLgItemName(r.itemName, r.color || '', r.year, r.visitVal, r.sub),
+    '_baseItemName': r.itemName,
+    '모델명':   r.model,
+    '색상':     '',
+    '제품구분': r.prodCat,
+    '관리방법': r.mgmtCode,
+    '세부구분': r.sub,
+    '약정방법': `${r.year}년의무`,
+    '의무':     r.months,
+    '렌탈료':   r.fee,
+    '방문주기': r.visitVal,
+    '프로모션': '',
+    '비고1':    r.bigo1,
+    '비고2':    '',
+    _hasError: false,
+  }));
+
+  const seen = new Set();
+  return result.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function LgLivingConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [fileName, setFileName] = useState('');
+  const [rawRows,  setRawRows]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, p, d) => { const res = transformLgLiving(rows, p, d); setResult(res); return res; };
+  const handlePrefix = (p) => { setPrefix(p); if (rawRows.length) doTransform(rawRows, p, dateStr); };
+  const handleDate   = (d) => { setDateStr(d); if (rawRows.length) doTransform(rawRows, prefix, d); };
+
+  const readFile = (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        setFileName(file.name);
+        setRawRows(rows);
+        const res = doTransform(rows, prefix, dateStr);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다. 파일 형식을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = rawRows.length > 0;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head"><div className="card-icon">📁</div><span className="card-title">LG 리빙 수수료표 업로드</span></div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <><div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div></>
+            ) : (
+              <><div className="drop-icon">🏠</div>
+                <div className="drop-title">LG 리빙 수수료표를 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">세탁기·스타일러·안마의자·청소기·슈케어</div>
+                <div className="drop-formats"><span className="fmt-tag">.xlsx</span><span className="fmt-tag">.xls</span></div></>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>품목명</b> 모델명 + [구분2] + [구분1] + 제품군 + (케어십형태)<br/>
+            · <b>없음/빈값</b> 구분1·구분2가 비어 있으면 품목에서 생략<br/>
+            · <b>제품구분</b> 세탁기류→033 · 건조기→009 · 스타일러→012 · 안마의자→004 · 청소기/로봇→035 · 슈케어→047<br/>
+            · <b>자가관리</b> 케어십형태에 "자가" 포함 → 관리없음(002)<br/>
+            · <b>렌탈료</b> 프로모션 최종(col22~29) 우선, 없으면 원요금 사용<br/>
+            · <b>미운영/0</b> 렌탈료·선납금이 "미운영" 또는 0이면 자동 제외<br/>
+            · <b>무시</b> 구독료할인·③ 최종·정산수수료·비고·채널·SIM
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head"><div className="card-icon">📖</div><span className="card-title">변환 규칙 참고</span></div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">품목명 구성</div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">모델명+구분2+구분1+제품군</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">중간 부분</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">구분1/2 없음·"없음"</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">품목에서 생략</span></div>
+              <div className="ref-rule-row"><span className="ref-rule-kw">예시</span><span className="ref-rule-arr">→</span><span className="ref-rule-out">SC5GMR80S 26년 5벌 스타일러 (프리미엄)</span></div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">제품구분 코드</div>
+              {[{kw:'세탁기류(워시콤보 등)',arr:'→',out:'033'},{kw:'건조기',arr:'→',out:'009'},{kw:'스타일러',arr:'→',out:'012'},{kw:'안마의자',arr:'→',out:'004'},{kw:'청소기·로봇청소기',arr:'→',out:'035'},{kw:'슈케어',arr:'→',out:'047 생활가전'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">세부구분 코드</div>
+              {[{kw:'구독요금',arr:'→',out:'001 일반'},{kw:'신규결합(3%)',arr:'→',out:'027'},{kw:'기존결합(3%)',arr:'→',out:'028'},{kw:'30%/50% 선납',arr:'→',out:'029 (비고1 기재)'}]
+                .map((r,i)=>(<div className="ref-rule-row" key={i}><span className="ref-rule-kw">{r.kw}</span><span className="ref-rule-arr">{r.arr}</span><span className="ref-rule-out">{r.out}</span></div>))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 변환 완료 · ✅ LG 리빙<br/>
+              <span style={{fontSize:12}}>출력 파일명: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG신전산.xlsx')}</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawRows([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result, fileName, 'LG리빙')}>📥 신전산 엑셀 다운로드</button>
+              <button className="btn-dl" style={{background:'#1565c0',marginLeft:8}} onClick={()=>exportLgXlsxShort(result, fileName, 'LG리빙')}>📥 신전산 엑셀 다운로드 2</button>
+              <button className="btn-ghost" style={{border:'1.5px solid var(--blue)',color:'var(--blue)'}} onClick={()=>exportGujeonXlsx(transformLgToGujeon(result, getFullDateStr(), 1), fileName)}>📥 구전산 변환 다운로드</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 최종본 – 7개 파일 합치기
+════════════════════════════════════════════════════════ */
+const FINAL_CATS = [
+  {id:'jeongsugi',   label:'정수기',          icon:'💧', fn: transformLgJeongsugi},
+  {id:'naengjanggo', label:'냉장고(김냉포함)', icon:'🧊', fn: transformLgNaengjanggo},
+  {id:'cooking',     label:'쿠킹',            icon:'🍳', fn: transformLgCooking},
+  {id:'tv',          label:'TV',             icon:'📺', fn: transformLgTV},
+  {id:'air',         label:'공기청정기',       icon:'💨', fn: transformLgAir},
+  {id:'aircon',      label:'에어컨',          icon:'❄️', fn: transformLgAircon},
+  {id:'living',      label:'리빙',            icon:'🏠', fn: transformLgLiving},
+];
+
+function combineLgAll(catData, prefix, dateStr) {
+  // 각 카테고리별 파싱 → 임시 코드로 결과 생성 → 전체 모델 재번호 부여
+  const DUMMY = ['XX','000000'];
+  const allRows = [];
+  for (const cat of FINAL_CATS) {
+    if (!catData[cat.id]) continue;
+    const rows = cat.fn(catData[cat.id], ...DUMMY);
+    allRows.push(...rows);
+  }
+  // 전체 모델 순서대로 전역 시퀀스 부여
+  const globalSeq = new Map();
+  let seq = 0;
+  allRows.forEach(r => {
+    const m = r['모델명'];
+    if (m && !globalSeq.has(m)) { seq++; globalSeq.set(m, seq); }
+  });
+  // 제품코드 교체 (4자리)
+  const finalRows = allRows.map(r => ({
+    ...r,
+    '제품코드': `${prefix}${dateStr}${String(globalSeq.get(r['모델명'])||1).padStart(4,'0')}`,
+  }));
+  // 최종 중복 제거
+  const seen = new Set();
+  return finalRows.filter(row => {
+    const key = OUTPUT_COLS.map(c => (row[c] ?? '')).join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function MiniSlot({ cat, fileData, onFile }) {
+  const inputRef = useRef();
+  const [over, setOver] = useState(false);
+
+  const readFile = (file) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        onFile(cat.id, file.name, rows);
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded = !!fileData;
+  return (
+    <div
+      className={`mini-slot${over?' mover':''}${loaded?' mloaded':''}`}
+      onDragOver={e=>{e.preventDefault();setOver(true);}}
+      onDragLeave={()=>setOver(false)}
+      onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+      onClick={()=>inputRef.current?.click()}
+    >
+      <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv"
+             onChange={e=>readFile(e.target.files[0])} style={{display:'none'}} />
+      <div className="mini-slot-icon">{loaded ? '✅' : cat.icon}</div>
+      <div className="mini-slot-label">{cat.label}</div>
+      <div className="mini-slot-status">
+        {loaded
+          ? fileData.name.replace(/\.(xlsx|xls|csv)$/i,'')
+          : '클릭 또는 드래그'}
+      </div>
+    </div>
+  );
+}
+
+function LgFinalConverter() {
+  const [prefix,   setPrefix]   = useState('LG');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [catData,  setCatData]  = useState({});
+  const [phase,    setPhase]    = useState('upload');
+  const [result,   setResult]   = useState([]);
+
+  const handleFile = (catId, name, rows) => {
+    setCatData(prev => ({...prev, [catId]: {name, rows}}));
+    setResult([]); setPhase('upload');
+  };
+
+  const uploadedCount = Object.keys(catData).length;
+  const canCombine = uploadedCount > 0;
+
+  const handleCombine = () => {
+    const rawMap = {};
+    Object.entries(catData).forEach(([key, {rows}]) => { rawMap[key] = rows; });
+    const res = combineLgAll(rawMap, prefix, dateStr);
+    setResult(res);
+    setPhase('preview');
+  };
+
+  const handlePrefix = (p) => {
+    setPrefix(p);
+    if (phase === 'preview' && canCombine) {
+      const rawMap = {};
+      Object.entries(catData).forEach(([k, {rows}]) => { rawMap[k] = rows; });
+      setResult(combineLgAll(rawMap, p, dateStr));
+    }
+  };
+  const handleDate = (d) => {
+    setDateStr(d);
+    if (phase === 'preview' && canCombine) {
+      const rawMap = {};
+      Object.entries(catData).forEach(([k, {rows}]) => { rawMap[k] = rows; });
+      setResult(combineLgAll(rawMap, prefix, d));
+    }
+  };
+
+  // 카테고리별 행수 분포
+  const catDist = {};
+  if (phase === 'preview') {
+    result.forEach(r => {
+      const g = FINAL_CATS.find(c => catData[c.id] && r['제품구분']);
+      // 제품구분으로 카테고리 추정
+    });
+  }
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head"><div className="card-icon">🏷️</div><span className="card-title">제품코드 설정 (전체 공통)</span></div>
+        <LgCodeConfig prefix={prefix} onPrefixChange={handlePrefix} dateStr={dateStr} onDateChange={handleDate} />
+      </div>
+
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">📂</div>
+          <span className="card-title">7개 카테고리 파일 업로드 ({uploadedCount} / 7)</span>
+          {uploadedCount > 0 && (
+            <span style={{marginLeft:'auto', fontSize:12, color:'var(--text-sub)'}}>
+              업로드된 파일 클릭 시 재업로드
+            </span>
+          )}
+        </div>
+        <div className="mini-upload-grid">
+          {FINAL_CATS.map(cat => (
+            <MiniSlot key={cat.id} cat={cat} fileData={catData[cat.id]} onFile={handleFile} />
+          ))}
+        </div>
+        <div style={{textAlign:'center', paddingTop:4}}>
+          <button className="btn-convert" onClick={handleCombine} disabled={!canCombine}>
+            ⚡ {uploadedCount > 0 ? `${uploadedCount}개 파일 합치기` : '파일을 업로드하세요'}
+          </button>
+          {canCombine && phase !== 'preview' && (
+            <div className="convert-hint">{uploadedCount}개 파일 준비됨 · 합치기를 눌러 하나의 신전산 파일로 만드세요</div>
+          )}
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <div className="card fi" style={{marginBottom:20}}>
+            <div className="card-head"><div className="card-icon">📊</div><span className="card-title">합치기 결과 요약</span></div>
+            <div className="stat-row" style={{flexWrap:'wrap'}}>
+              <div className="stat-chip all"><span>전체</span><span className="stat-num">{result.length.toLocaleString()}</span><span>행</span></div>
+              <div className="stat-chip ok"><span>모델</span><span className="stat-num">{new Set(result.map(r=>r['모델명'])).size.toLocaleString()}</span><span>개</span></div>
+              {FINAL_CATS.filter(c=>catData[c.id]).map(c=>(
+                <div key={c.id} className="stat-chip all" style={{fontSize:11}}>
+                  <span>{c.icon}</span><span>{c.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <PreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 합치기 완료 ({uploadedCount}개 카테고리)<br/>
+              <span style={{fontSize:12}}>제품코드: {prefix}{dateStr}0001 ~ {prefix}{dateStr}{String(new Set(result.map(r=>r['모델명'])).size).padStart(4,'0')} · 출력: LG전자_신전산_최종본.xlsx</span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setResult([]);}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportLgXlsx(result,'LG전자_최종본.xlsx','LG신전산최종')}>
+                📥 최종본 엑셀 다운로드
+              </button>
+              {result.length > 9000 && (
+                <button
+                  className="btn-dl"
+                  style={{background:'var(--blue)', boxShadow:'0 4px 14px rgba(37,99,235,0.5)'}}
+                  onClick={()=>exportLgXlsxSplit(result,'LG전자_최종본.xlsx','LG신전산최종',9000)}
+                >
+                  📦 9000행 분할 ({Math.ceil(result.length/9000)}개 파일)
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+const LG_SUBTABS = [
+  {id:'jeongsugi',  label:'정수기',          enabled:true},
+  {id:'naengjanggo',label:'냉장고(김냉포함)', enabled:true},
+  {id:'cooking',    label:'쿠킹',            enabled:true},
+  {id:'tv',         label:'TV',             enabled:true},
+  {id:'air',        label:'공기청정기',       enabled:true},
+  {id:'aircon',     label:'에어컨',          enabled:true},
+  {id:'living',     label:'리빙',            enabled:true},
+  {id:'final',      label:'✨ 최종합치기',    enabled:true},
+];
+
+function LgConverter() {
+  const [subTab, setSubTab] = useState('jeongsugi');
+  return (
+    <>
+      <div className="lg-subtabs">
+        {LG_SUBTABS.map(t => (
+          <button
+            key={t.id}
+            className={`lg-subtab-btn${subTab===t.id?' active':''}${!t.enabled?' dimmed':''}`}
+            onClick={()=>t.enabled && setSubTab(t.id)}
+          >
+            {t.label}{!t.enabled && ' 🔒'}
+          </button>
+        ))}
+      </div>
+      {subTab === 'jeongsugi'   && <LgJeongsugiConverter />}
+      {subTab === 'naengjanggo' && <LgNaengjanggoConverter />}
+      {subTab === 'cooking'     && <LgCookingConverter />}
+      {subTab === 'tv'          && <LgTVConverter />}
+      {subTab === 'air'         && <LgAirConverter />}
+      {subTab === 'aircon'      && <LgAirconConverter />}
+      {subTab === 'living'      && <LgLivingConverter />}
+      {subTab === 'final'       && <LgFinalConverter />}
+      {subTab !== 'jeongsugi' && subTab !== 'naengjanggo' && subTab !== 'cooking' && subTab !== 'tv' && subTab !== 'air' && subTab !== 'aircon' && subTab !== 'living' && subTab !== 'final' && (
+        <div className="coming-soon">
+          <div className="coming-soon-icon">🔧</div>
+          <div className="coming-soon-title">준비 중</div>
+          <div className="coming-soon-sub">순차적으로 업데이트 예정입니다.</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LG전자 신전산 → 구전산 변환
+════════════════════════════════════════════════════════ */
+const GUJEON_OUTPUT_COLS = [
+  '제품코드','제품명','모델명','제품그룹','브랜드',
+  '일반판매가','렌탈기간','렌탈가','접수여부','조리수체크',
+  '제품설명','세부구분','입력자','입력일시','수정자','수정일시',
+];
+
+function getFullDateStr() {
+  const d = new Date();
+  const yyyy = String(d.getFullYear());
+  const mm   = String(d.getMonth()+1).padStart(2,'0');
+  const dd   = String(d.getDate()).padStart(2,'0');
+  return yyyy + mm + dd;
+}
+
+function buildGujeonProductName(row) {
+  const 품목     = String(row['품목']     || '').trim();
+  const 약정     = String(row['약정방법'] || '').trim();
+  const 방문     = String(row['방문주기'] || '').trim();
+  const 색상     = String(row['색상']     || '').trim();
+  const 세부구분 = String(row['세부구분'] || '').trim();
+  const 비고1   = String(row['비고1']    || '').trim();
+
+  let name = 품목;
+  if (약정) name += ` (${약정})`;
+  if (방문 === '관리없음') {
+    name += ' [자가관리]';
+  } else if (방문) {
+    name += ` ${방문}방문`;
+  }
+
+  if (세부구분 === '029' && 비고1) {
+    // "30% 선납금 : 1,652,400원" → "[선납금 30% 1,652,400원]"
+    const m = 비고1.match(/(\d+)%\s*선납금\s*:\s*([\d,]+원)/);
+    name += m ? ` [선납금 ${m[1]}% ${m[2]}]` : ` [${비고1}]`;
+  } else if (색상) {
+    const colorName = 색상.split(',')
+      .map(c => c.replace(/\s*\([A-Za-z0-9]+\)$/, '').trim())
+      .filter(Boolean).join('/') || 색상;
+    name += ` [${colorName}]`;
+  }
+  return name;
+}
+
+function transformLgToGujeon(rows, dateStr, startSeq) {
+  const result = [];
+  let seq = startSeq || 1;
+  for (const row of rows) {
+    const model = String(row['모델명'] || '').trim();
+    if (!model) continue;
+    result.push({
+      '제품코드':   `LG${dateStr}${String(seq++).padStart(4,'0')}`,
+      '제품명':     buildGujeonProductName(row),
+      '모델명':     model,
+      '제품그룹':   String(row['제품구분'] || '').trim(),
+      '브랜드':     '□LG퓨리케어',
+      '일반판매가': 0,
+      '렌탈기간':   row['의무']   !== undefined ? row['의무']   : '',
+      '렌탈가':     row['렌탈료'] !== undefined ? row['렌탈료'] : '',
+      '접수여부':   '',
+      '조리수체크': '',
+      '제품설명':   '',
+      '세부구분':   String(row['세부구분'] || '').trim(),
+      '입력자':     'TNC임진형',
+      '입력일시':   '',
+      '수정자':     '',
+      '수정일시':   '',
+    });
+  }
+  return result;
+}
+
+function exportGujeonXlsx(result, fileName) {
+  const data = result.map(row => {
+    const out = {};
+    GUJEON_OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: GUJEON_OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '구전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_LG구전산.xlsx'));
+}
+
+function exportGujeonXlsxSplit(result, fileName, chunkSize) {
+  const size = chunkSize || 5000;
+  const total = Math.ceil(result.length / size);
+  const base = fileName.replace(/\.(xlsx|xls|csv)$/i, '');
+  for (let i = 0; i < total; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        const chunk = result.slice(idx * size, (idx + 1) * size);
+        const data = chunk.map(row => {
+          const out = {};
+          GUJEON_OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+          return out;
+        });
+        const ws = XLSX.utils.json_to_sheet(data, { header: GUJEON_OUTPUT_COLS });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '구전산');
+        XLSX.writeFile(wb, `${base}_구전산_${String(idx+1).padStart(3,'0')}of${String(total).padStart(3,'0')}.xlsx`);
+      }, idx * 700);
+    })(i);
+  }
+}
+
+function GujeonPreviewTable({ result }) {
+  const HIGHLIGHT = new Set(['제품코드','제품명']);
+  return (
+    <div className="card fi">
+      <div className="card-head">
+        <div className="card-icon">📋</div>
+        <span className="card-title">변환 미리보기 (구전산)</span>
+      </div>
+      <div className="stat-row">
+        <div className="stat-chip all">
+          <span>전체</span><span className="stat-num">{result.length.toLocaleString()}</span><span>행</span>
+        </div>
+        <div className="stat-chip ok">
+          <span>✓</span><span className="stat-num">{result.length.toLocaleString()}</span><span>성공</span>
+        </div>
+      </div>
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{textAlign:'center',width:36}}>#</th>
+              {GUJEON_OUTPUT_COLS.map(c => (
+                <th key={c} className={HIGHLIGHT.has(c)?'new-col':''}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {result.map((row, i) => (
+              <tr key={i}>
+                <td className="rnum">{i+1}</td>
+                {GUJEON_OUTPUT_COLS.map(c => {
+                  const val = row[c] !== undefined ? String(row[c]) : '';
+                  return <td key={c} className={HIGHLIGHT.has(c)?'code-cell':'mono'} title={val}>{val || '—'}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function LgToGujeonConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [dateStr,  setDateStr]  = useState(getFullDateStr());
+  const [startSeq, setStartSeq] = useState('1');
+  const [fileName, setFileName] = useState('');
+  const [rawData,  setRawData]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, date, seq) => {
+    const res = transformLgToGujeon(rows, date, parseInt(seq)||1);
+    setResult(res);
+    return res;
+  };
+  const handleDate = d => { setDateStr(d); if (rawData.length) doTransform(rawData, d, startSeq); };
+  const handleSeq  = s => { setStartSeq(s); if (rawData.length) doTransform(rawData, dateStr, s); };
+
+  const readFile = file => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, {defval:''});
+        if (!json.length) { alert('데이터가 없습니다.'); return; }
+        setFileName(file.name);
+        setRawData(json);
+        const res = doTransform(json, dateStr, startSeq);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다.\n신전산 CMS 파일(품목·모델명 컬럼 포함)을 확인해주세요.');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded  = rawData.length > 0;
+  const seqNum  = parseInt(startSeq) || 1;
+  const endSeq  = seqNum + result.length - 1;
+
+  return (
+    <>
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">🏷️</div>
+          <span className="card-title">제품코드 설정 (LG + 날짜 8자리 + 순번 4자리)</span>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:18, flexWrap:'wrap'}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>날짜(YYYYMMDD)</span>
+            <input
+              style={{height:36, width:120, padding:'0 10px', border:'1.5px solid var(--gray-2)', borderRadius:8, fontSize:13, fontFamily:'var(--mono)', background:'var(--white)', color:'var(--text)', outline:'none'}}
+              type="text" maxLength={8} placeholder="20260601" value={dateStr}
+              onChange={e => handleDate(e.target.value.replace(/\D/g,'').slice(0,8))}
+            />
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>시작 번호</span>
+            <input
+              style={{height:36, width:80, padding:'0 10px', border:'1.5px solid var(--gray-2)', borderRadius:8, fontSize:13, fontFamily:'var(--mono)', background:'var(--white)', color:'var(--text)', outline:'none'}}
+              type="number" min={1} value={startSeq}
+              onChange={e => handleSeq(e.target.value)}
+            />
+          </div>
+          <div className="code-preview-box">
+            <div className="code-preview">LG{dateStr||'YYYYMMDD'}{String(seqNum).padStart(4,'0')}</div>
+            <div className="code-preview-note">각 행마다 순차 증가 · 모든 행 고유번호</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head">
+            <div className="card-icon">📁</div>
+            <span className="card-title">LG전자 신전산 CMS 파일 업로드</span>
+          </div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <>
+                <div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div>
+              </>
+            ) : (
+              <>
+                <div className="drop-icon">📊</div>
+                <div className="drop-title">LG전자 신전산 CMS 파일을 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">신전산 변환기 출력 파일 (_LG신전산.xlsx)</div>
+                <div className="drop-formats">
+                  <span className="fmt-tag">.xlsx</span>
+                  <span className="fmt-tag">.xls</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>자동 처리 항목</strong>
+            · <b>제품코드</b> LG + 날짜(8자리) + 순번 — 모든 행 고유번호<br/>
+            · <b>제품명</b> 품목 (약정방법) 방문주기방문 [색상] 조합<br/>
+            · <b>브랜드</b> □LG퓨리케어 (고정값)<br/>
+            · <b>일반판매가</b> 0 (고정값)<br/>
+            · <b>입력자</b> TNC임진형 (고정값)<br/>
+            · <b>빈 값</b> 접수여부 · 조리수체크 · 제품설명 · 입력일시 · 수정자 · 수정일시
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head">
+            <div className="card-icon">📖</div>
+            <span className="card-title">변환 규칙 참고</span>
+          </div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">신전산 → 구전산 컬럼 매핑</div>
+              {[
+                {kw:'제품코드',        arr:'→', out:'LG+날짜(8자리)+순번(4자리)'},
+                {kw:'품목+약정+방문+색상', arr:'→', out:'제품명 (통합)'},
+                {kw:'모델명',          arr:'→', out:'모델명 그대로'},
+                {kw:'제품구분',        arr:'→', out:'제품그룹'},
+                {kw:'브랜드 (고정)',   arr:'→', out:'□LG퓨리케어'},
+                {kw:'일반판매가 (고정)',arr:'→', out:'0'},
+                {kw:'의무 (개월)',     arr:'→', out:'렌탈기간'},
+                {kw:'렌탈료',         arr:'→', out:'렌탈가'},
+                {kw:'세부구분',        arr:'→', out:'세부구분 그대로'},
+                {kw:'입력자 (고정)',   arr:'→', out:'TNC임진형'},
+              ].map((r,i)=>(
+                <div className="ref-rule-row" key={i}>
+                  <span className="ref-rule-kw">{r.kw}</span>
+                  <span className="ref-rule-arr">{r.arr}</span>
+                  <span className="ref-rule-out">{r.out}</span>
+                </div>
+              ))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">제품명 구성 예시</div>
+              <div style={{fontSize:11.5, padding:'10px 12px', background:'var(--orange-08)', border:'1px solid var(--orange-15)', borderRadius:8, fontFamily:'var(--mono)', color:'var(--text)', lineHeight:1.9}}>
+                품목: 얼음(2세대) 정수기<br/>
+                약정: 6년의무 · 방문: 6개월 · 색상: 블랙<br/>
+                <span style={{color:'var(--orange)', fontWeight:700}}>→ 얼음(2세대) 정수기 (6년의무) 6개월방문 [블랙]</span>
+              </div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">빈 값 처리 컬럼</div>
+              <div className="color-chip-grid">
+                {['접수여부','조리수체크','제품설명','입력일시','수정자','수정일시'].map(c=>(
+                  <span className="color-chip" key={c}>{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <GujeonPreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> 구전산 변환 완료 · ✅ □LG퓨리케어<br/>
+              <span style={{fontSize:12}}>
+                제품코드 LG{dateStr}{String(seqNum).padStart(4,'0')} ~ LG{dateStr}{String(endSeq).padStart(4,'0')} · 출력: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_LG구전산.xlsx')}
+              </span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawData([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportGujeonXlsx(result, fileName)}>📥 구전산 엑셀 다운로드</button>
+              {result.length > 9000 && (
+                <button
+                  className="btn-dl"
+                  style={{background:'var(--blue)', boxShadow:'0 4px 14px rgba(37,99,235,0.5)'}}
+                  onClick={()=>exportGujeonXlsxSplit(result, fileName, 9000)}
+                >
+                  📦 9000행 분할 ({Math.ceil(result.length/9000)}개 파일)
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   KT가전 구전산 변환
+════════════════════════════════════════════════════════ */
+// 입력: 브랜드(A), 제품그룹(B), 상품명(C), 모델코드(D), 계약기간(E), 렌탈료(F)
+// 출력: 구전산 CMS (GUJEON_OUTPUT_COLS 동일)
+
+function transformKT(rows, dateStr, startSeq) {
+  const result = [];
+  let seq = startSeq || 1;
+  for (let i = 1; i < rows.length; i++) {  // row[0] = 헤더 스킵
+    const row    = rows[i];
+    const 상품명  = String(row[2] || '').trim();
+    const 모델코드 = String(row[3] || '').trim();
+    const 계약기간 = Number(row[4]);
+    const 렌탈료  = Number(row[5]);
+    const 제품그룹텍스트 = String(row[1] || '').trim();
+
+    if (!상품명 || !모델코드) continue;
+    if (isNaN(계약기간) || 계약기간 <= 0) continue;
+    if (isNaN(렌탈료)  || 렌탈료  <= 0) continue;
+
+    const 제품그룹코드 = detectCategory(제품그룹텍스트 + ' ' + 상품명);
+
+    result.push({
+      '제품코드':   `KT${dateStr}${String(seq++).padStart(3,'0')}`,
+      '제품명':     `${상품명} (${계약기간})`,
+      '모델명':     모델코드,
+      '제품그룹':   제품그룹코드,
+      '브랜드':     '■KT가전구독',
+      '일반판매가': 0,
+      '렌탈기간':   계약기간,
+      '렌탈가':     렌탈료,
+      '접수여부':   '',
+      '조리수체크': '',
+      '제품설명':   '',
+      '세부구분':   '',
+      '입력자':     'TNC임진형',
+      '입력일시':   '',
+      '수정자':     '',
+      '수정일시':   '',
+    });
+  }
+  return result;
+}
+
+function exportKTXlsx(result, fileName) {
+  const data = result.map(row => {
+    const out = {};
+    GUJEON_OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+    return out;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: GUJEON_OUTPUT_COLS });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '구전산');
+  XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, '_KT구전산.xlsx'));
+}
+
+function exportKTXlsxSplit(result, fileName, chunkSize) {
+  const size  = chunkSize || 9000;
+  const total = Math.ceil(result.length / size);
+  const base  = fileName.replace(/\.(xlsx|xls|csv)$/i, '');
+  for (let i = 0; i < total; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        const chunk = result.slice(idx * size, (idx + 1) * size);
+        const data  = chunk.map(row => {
+          const out = {};
+          GUJEON_OUTPUT_COLS.forEach(c => { out[c] = row[c] !== undefined ? row[c] : ''; });
+          return out;
+        });
+        const ws = XLSX.utils.json_to_sheet(data, { header: GUJEON_OUTPUT_COLS });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '구전산');
+        XLSX.writeFile(wb, `${base}_KT구전산_${String(idx+1).padStart(3,'0')}of${String(total).padStart(3,'0')}.xlsx`);
+      }, idx * 700);
+    })(i);
+  }
+}
+
+function KTPreviewTable({ result }) {
+  const HIGHLIGHT = new Set(['제품코드','제품명']);
+  return (
+    <div className="card fi">
+      <div className="card-head">
+        <div className="card-icon">📋</div>
+        <span className="card-title">변환 미리보기 (구전산)</span>
+      </div>
+      <div className="stat-row">
+        <div className="stat-chip all"><span>전체</span><span className="stat-num">{result.length.toLocaleString()}</span><span>행</span></div>
+        <div className="stat-chip ok"><span>✓</span><span className="stat-num">{result.length.toLocaleString()}</span><span>성공</span></div>
+      </div>
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{textAlign:'center',width:36}}>#</th>
+              {GUJEON_OUTPUT_COLS.map(c=>(
+                <th key={c} className={HIGHLIGHT.has(c)?'new-col':''}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {result.map((row,i)=>(
+              <tr key={i}>
+                <td className="rnum">{i+1}</td>
+                {GUJEON_OUTPUT_COLS.map(c=>{
+                  const val=row[c]!==undefined?String(row[c]):'';
+                  return <td key={c} className={HIGHLIGHT.has(c)?'code-cell':'mono'} title={val}>{val||'—'}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function KTConverter() {
+  const [phase,    setPhase]    = useState('upload');
+  const [dateStr,  setDateStr]  = useState(getTodayDateStr());
+  const [startSeq, setStartSeq] = useState('1');
+  const [fileName, setFileName] = useState('');
+  const [rawData,  setRawData]  = useState([]);
+  const [result,   setResult]   = useState([]);
+  const [over,     setOver]     = useState(false);
+  const inputRef = useRef();
+
+  const doTransform = (rows, date, seq) => {
+    const res = transformKT(rows, date, parseInt(seq)||1);
+    setResult(res);
+    return res;
+  };
+  const handleDate = d => { setDateStr(d); if (rawData.length) doTransform(rawData, d, startSeq); };
+  const handleSeq  = s => { setStartSeq(s); if (rawData.length) doTransform(rawData, dateStr, s); };
+
+  const readFile = file => {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) { alert('xlsx, xls, csv 파일만 가능합니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (!json.length) { alert('데이터가 없습니다.'); return; }
+        setFileName(file.name);
+        setRawData(json);
+        const res = doTransform(json, dateStr, startSeq);
+        if (res.length > 0) setPhase('preview');
+        else alert('변환된 데이터가 없습니다.\n파일 형식을 확인해주세요. (헤더: 브랜드, 제품그룹, 상품명, 모델코드, 계약기간, 렌탈료)');
+      } catch(err) { alert('파일 읽기 오류: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const loaded  = rawData.length > 0;
+  const seqNum  = parseInt(startSeq) || 1;
+  const endSeq  = seqNum + result.length - 1;
+
+  return (
+    <>
+      {/* 제품코드 설정 */}
+      <div className="card fi" style={{marginBottom:20}}>
+        <div className="card-head">
+          <div className="card-icon">🏷️</div>
+          <span className="card-title">제품코드 설정 (KT + 날짜 6자리 + 순번 3자리)</span>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:18, flexWrap:'wrap'}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>날짜(YYMMDD)</span>
+            <input
+              style={{height:36, width:110, padding:'0 10px', border:'1.5px solid var(--gray-2)', borderRadius:8, fontSize:13, fontFamily:'var(--mono)', background:'var(--white)', color:'var(--text)', outline:'none'}}
+              type="text" maxLength={6} placeholder="260601" value={dateStr}
+              onChange={e => handleDate(e.target.value.replace(/\D/g,'').slice(0,6))}
+            />
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <span style={{fontSize:13, fontWeight:600, color:'var(--text-sub)'}}>시작 번호</span>
+            <input
+              style={{height:36, width:80, padding:'0 10px', border:'1.5px solid var(--gray-2)', borderRadius:8, fontSize:13, fontFamily:'var(--mono)', background:'var(--white)', color:'var(--text)', outline:'none'}}
+              type="number" min={1} value={startSeq}
+              onChange={e => handleSeq(e.target.value)}
+            />
+          </div>
+          <div className="code-preview-box">
+            <div className="code-preview">KT{dateStr||'YYMMDD'}{String(seqNum).padStart(3,'0')}</div>
+            <div className="code-preview-note">각 행마다 순차 증가 · 모든 행 고유번호</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2 fi">
+        <div className="card">
+          <div className="card-head">
+            <div className="card-icon">📁</div>
+            <span className="card-title">KT 가전제품 파일 업로드</span>
+          </div>
+          <div
+            className={`drop-zone${over?' over':''}${loaded?' loaded':''}`}
+            onDragOver={e=>{e.preventDefault();setOver(true);}}
+            onDragLeave={()=>setOver(false)}
+            onDrop={e=>{e.preventDefault();setOver(false);readFile(e.dataTransfer.files[0]);}}
+            onClick={()=>inputRef.current?.click()}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={e=>readFile(e.target.files[0])} />
+            {loaded ? (
+              <>
+                <div className="drop-icon">✅</div>
+                <div className="drop-title" style={{color:'var(--green)'}}>{fileName}</div>
+                <div className="drop-sub">{result.length.toLocaleString()}행 변환됨 · 클릭하여 재업로드</div>
+              </>
+            ) : (
+              <>
+                <div className="drop-icon">📊</div>
+                <div className="drop-title">KT 가전제품 파일을 이곳에 끌어다 놓으세요</div>
+                <div className="drop-sub">KT_가전제품.xlsx 형식</div>
+                <div className="drop-formats">
+                  <span className="fmt-tag">.xlsx</span>
+                  <span className="fmt-tag">.xls</span>
+                  <span className="fmt-tag">.csv</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="info-box">
+            <strong>입력 파일 컬럼 구조</strong>
+            · <b>A열</b> 브랜드 (삼성전자, LG전자 등)<br/>
+            · <b>B열</b> 제품그룹 (세탁기, 정수기 등) → 카테고리 코드 자동 변환<br/>
+            · <b>C열</b> 상품명 → 제품명에 계약기간 추가: "삼성 세탁기 21KG (36)"<br/>
+            · <b>D열</b> 모델코드 → 모델명<br/>
+            · <b>E열</b> 계약기간 → 렌탈기간<br/>
+            · <b>F열</b> 렌탈료 → 렌탈가
+          </div>
+        </div>
+
+        <div className="card fi fi-1">
+          <div className="card-head">
+            <div className="card-icon">📖</div>
+            <span className="card-title">변환 규칙 참고</span>
+          </div>
+          <div>
+            <div className="ref-block">
+              <div className="sec-label">구전산 컬럼 매핑</div>
+              {[
+                {kw:'제품코드', arr:'→', out:'KT+YYMMDD+순번(3자리)'},
+                {kw:'제품명',   arr:'→', out:'상품명 (계약기간)'},
+                {kw:'모델명',   arr:'→', out:'D열 모델코드'},
+                {kw:'제품그룹', arr:'→', out:'B열 → 카테고리 코드'},
+                {kw:'브랜드',   arr:'→', out:'■KT가전구독'},
+                {kw:'일반판매가', arr:'→', out:'0'},
+                {kw:'렌탈기간', arr:'→', out:'E열 계약기간'},
+                {kw:'렌탈가',   arr:'→', out:'F열 렌탈료'},
+                {kw:'세부구분', arr:'→', out:'(빈 값)'},
+                {kw:'입력자',   arr:'→', out:'TNC임진형'},
+              ].map((r,i)=>(
+                <div className="ref-rule-row" key={i}>
+                  <span className="ref-rule-kw">{r.kw}</span>
+                  <span className="ref-rule-arr">{r.arr}</span>
+                  <span className="ref-rule-out">{r.out}</span>
+                </div>
+              ))}
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">제품명 구성 예시</div>
+              <div style={{fontSize:11.5, padding:'10px 12px', background:'var(--orange-08)', border:'1px solid var(--orange-15)', borderRadius:8, fontFamily:'var(--mono)', color:'var(--text)', lineHeight:1.9}}>
+                상품명: 삼성 세탁기 21KG<br/>
+                계약기간: 36<br/>
+                <span style={{color:'var(--orange)', fontWeight:700}}>→ 삼성 세탁기 21KG (36)</span>
+              </div>
+            </div>
+            <div className="divider" />
+            <div className="ref-block">
+              <div className="sec-label">빈 값 처리 컬럼</div>
+              <div className="color-chip-grid">
+                {['접수여부','조리수체크','제품설명','세부구분','입력일시','수정자','수정일시'].map(c=>(
+                  <span className="color-chip" key={c}>{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {phase === 'preview' && result.length > 0 && (
+        <>
+          <KTPreviewTable result={result} />
+          <div className="act-bar fi fi-2">
+            <div className="act-info">
+              <strong>{result.length.toLocaleString()}행</strong> KT가전 구전산 변환 완료 · ✅<br/>
+              <span style={{fontSize:12}}>
+                제품코드 KT{dateStr}{String(seqNum).padStart(3,'0')} ~ KT{dateStr}{String(endSeq).padStart(3,'0')} · 출력: {fileName.replace(/\.(xlsx|xls|csv)$/i,'_KT구전산.xlsx')}
+              </span>
+            </div>
+            <div className="act-btns">
+              <button className="btn-ghost" onClick={()=>{setPhase('upload');setRawData([]);setResult([]);setFileName('');}}>← 초기화</button>
+              <button className="btn-dl" onClick={()=>exportKTXlsx(result, fileName)}>📥 구전산 엑셀 다운로드</button>
+              {result.length > 9000 && (
+                <button
+                  className="btn-dl"
+                  style={{background:'var(--blue)', boxShadow:'0 4px 14px rgba(37,99,235,0.5)'}}
+                  onClick={()=>exportKTXlsxSplit(result, fileName, 9000)}
+                >
+                  📦 9000행 분할 ({Math.ceil(result.length/9000)}개 파일)
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   루트 앱
+════════════════════════════════════════════════════════ */
+function TabApp() {
+  const [tab, setTab] = useState('coway');
+  return (
+    <div>
+      <header className="hdr">
+        <div className="hdr-brand">
+          <div className="hdr-mark">⚡</div>
+          <div>
+            <div className="hdr-title">렌탈 매직 컨버터</div>
+            <div className="hdr-sub">CMS 데이터 자동 변환기 (신전산 ↔ 구전산)</div>
+          </div>
+        </div>
+        <div className="hdr-tabs">
+          <button
+            className={`tab-btn${tab==='coway'?' active':''}`}
+            onClick={()=>setTab('coway')}
+          >
+            코웨이 CMS 변환
+          </button>
+          <button
+            className={`tab-btn${tab==='gajeon'?' active':''}`}
+            onClick={()=>setTab('gajeon')}
+          >
+            가전종합 변환
+          </button>
+          <button
+            className={`tab-btn${tab==='lg'?' active':''}`}
+            onClick={()=>setTab('lg')}
+          >
+            LG전자 변환
+          </button>
+          <button
+            className={`tab-btn${tab==='lg2gujeon'?' active':''}`}
+            onClick={()=>setTab('lg2gujeon')}
+          >
+            LG(신전산)→구전산
+          </button>
+          <button
+            className={`tab-btn${tab==='kt'?' active':''}`}
+            onClick={()=>setTab('kt')}
+          >
+            KT가전 구전산
+          </button>
+        </div>
+        <div className="hdr-badge"><span className="pulse"></span>로컬 전용 · 외부 서버 전송 없음</div>
+      </header>
+
+      <main className="main">
+        {tab==='coway'      && <CowayConverter />}
+        {tab==='gajeon'     && <GaJeonConverter />}
+        {tab==='lg'         && <LgConverter />}
+        {tab==='lg2gujeon'  && <LgToGujeonConverter />}
+        {tab==='kt'         && <KTConverter />}
+      </main>
+
+      <footer className="footer">
+        모든 데이터는 이 브라우저 안에서만 처리됩니다. 외부 서버로 전송되는 정보는 없습니다.
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<TabApp />);
+</script>
+</body>
+</html>
