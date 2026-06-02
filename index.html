@@ -1157,7 +1157,13 @@ function exportLgXlsxShort(result, fileName, sheetName) {
   const data = result.map(row => {
     const out = {};
     OUTPUT_COLS.forEach(c => {
-      if (c === '품목') out[c] = row['_baseItemName'] || row[c] || '';
+      if (c === '품목') {
+        let base = row['_baseItemName'] || row[c] || '';
+        // 모델명이 품목 앞에 붙어있으면 제거 (예: "J826GBB142.CKOR 얼정냉..." → "얼정냉...")
+        const model = row['모델명'] || '';
+        if (model && base.startsWith(model + ' ')) base = base.slice(model.length + 1).trim();
+        out[c] = base;
+      }
       else out[c] = row[c] !== undefined ? row[c] : '';
     });
     return out;
