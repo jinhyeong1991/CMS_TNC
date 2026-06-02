@@ -2638,7 +2638,7 @@ function transformLgTV(rawRows, prefix, dateStr) {
     const mgmtCode = isJaga ? '002' : '001';
 
     const 설치부분  = (설치타입 && 설치타입 !== '-') ? ` [${설치타입}]` : '';
-    const 서비스부분 = (svcType && svcType !== '-') ? ` (${svcType})` : '';
+    const 서비스부분 = (svcType && svcType !== '-' && svcType.includes('넷플릭스')) ? ` [${svcType}]` : '';
     const itemName  = `${모델명} ${제품군}${설치부분}${서비스부분}`;
 
     // 구독료 (L~S, col[11~18] — 5월·6월 동일)
